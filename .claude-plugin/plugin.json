@@ -1,0 +1,8 @@
+{
+  "name": "pr-cycle",
+  "version": "1.0.0",
+  "description": "Claude Code PR workflow with Ralph Loop, Vibe Kanban, batch coordination and independent review.",
+  "author": {
+    "name": "YuShen"
+  }
+}

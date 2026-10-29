@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "vibe_kanban": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "vibe-kanban@0.0.166", "--mcp"],
+      "env": {"VIBE_BACKEND_URL": "http://127.0.0.1:13680"}
+    }
+  }
+}

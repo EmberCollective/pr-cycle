@@ -1,0 +1,4 @@
+.pr-cycle-runtime/
+.claude/ralph-loop.local.md
+.claude/pr-cycle-coordinator.lock
+__pycache__/

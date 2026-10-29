@@ -1,0 +1,21 @@
+Third-party notices for pr-cycle
+
+This repository extracts the PR workflow and adapters from yushen-skills.
+The original MIT copyright notice is retained in LICENSE.
+
+External runtimes are downloaded separately and are not distributed in this
+repository. The root MIT license does not relicense these external works:
+
+- Anthropic claude-plugins-official / ralph-loop 1.0.1, pinned to commit
+  f8c5e7a1dcb71b10cb74586224b5401f3de5db28. The setup script retains the
+  upstream checkout, including its original notices and license files.
+- BloopAI/vibe-kanban 0.0.166, pinned to commit
+  0c91b082357972dbcfd79c93ab8d899b78181f1a, licensed under Apache-2.0.
+- jq, obtained from its official release with a pinned SHA-256 checksum.
+  Its upstream notices and applicable license continue to apply.
+- Claude Code, installed and authenticated separately by the user, under
+  its own service terms and license.
+
+Runtime versions and download checksums are recorded in
+skills/pr-cycle/assets/claude-runtime.lock.json and runtime.lock.json.
+See ACKNOWLEDGEMENTS.md for source links and adaptation boundaries.

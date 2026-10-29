@@ -1,0 +1,15 @@
+{
+  "ralph_loop": {
+    "repository": "https://github.com/anthropics/claude-plugins-official.git",
+    "commit": "f8c5e7a1dcb71b10cb74586224b5401f3de5db28",
+    "version": "1.0.1",
+    "plugin_path": "plugins/ralph-loop"
+  },
+  "jq": {
+    "version": "1.8.1",
+    "platform": "windows-amd64",
+    "url": "https://github.com/jqlang/jq/releases/download/jq-1.8.1/jq-windows-amd64.exe",
+    "sha256": "23cb60a1354eed6bcc8d9b9735e8c7b388cd1fdcb75726b93bc299ef22dd9334"
+  },
+  "verified_on": "2026-10-28"
+}

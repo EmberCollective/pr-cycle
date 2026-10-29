@@ -1,0 +1,12 @@
+{
+  "name": "vibe-kanban",
+  "version": "0.0.166",
+  "tag": "v0.0.166-20260129191918",
+  "commit": "0c91b082357972dbcfd79c93ab8d899b78181f1a",
+  "repository": "https://github.com/BloopAI/vibe-kanban",
+  "license": "Apache-2.0",
+  "npm_integrity": "sha512-WgcxHMaMNqztT//Mz2VqWU078f9ouQVitoVlf4r6NUK2XngDMH2BvMgecxv/n3A4pV9VVJTivMuN8KnpsWBJng==",
+  "manifest": "https://npm-cdn.vibekanban.com/binaries/v0.0.166-20260129191918/manifest.json",
+  "verified_on": "2026-10-28",
+  "upgrade_policy": "Explicit migration only; newer releases retire local project boards and change task APIs."
+}

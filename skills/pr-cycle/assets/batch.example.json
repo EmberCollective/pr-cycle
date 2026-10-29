@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "batch_id": "profile-settings",
+  "title": "用户资料设置批次（示例，替换后执行）",
+  "project_id": "00000000-0000-0000-0000-000000000000",
+  "max_parallel": 3,
+  "tasks": [
+    {
+      "id": "profile-api",
+      "title": "资料读写 API",
+      "description": "P1：新增资料读写功能，至少一位有项目审批权限的人类同意当前版本后才能合并。实现当前用户资料读写，沿用现有认证和数据模型。",
+      "acceptance": ["登录用户可读取及修改自己的昵称", "未登录请求被拒绝，不能修改其他用户资料"],
+      "depends_on": [],
+      "resources": ["profile-schema"]
+    },
+    {
+      "id": "settings-shell",
+      "title": "设置页入口",
+      "description": "P1：新增用户可见功能入口，至少一位有项目审批权限的人类同意当前版本后才能合并。增加设置页导航和页面容器，复用现有路由与组件。",
+      "acceptance": ["从现有导航可进入设置页并返回", "窄屏下导航和页面可用"],
+      "depends_on": [],
+      "resources": ["navigation"]
+    },
+    {
+      "id": "profile-form",
+      "title": "资料编辑表单",
+      "description": "P1：新增资料编辑功能，至少一位有项目审批权限的人类同意当前版本后才能合并。将资料表单接入已验收的 API 与设置页，完成组合用户路径。",
+      "acceptance": ["修改昵称后刷新仍保留", "提交失败保留输入并显示可恢复错误"],
+      "depends_on": ["profile-api", "settings-shell"],
+      "resources": ["profile-schema", "navigation"]
+    }
+  ]
+}
