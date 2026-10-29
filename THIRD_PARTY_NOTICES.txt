@@ -1,6 +1,9 @@
 Third-party notices for pr-cycle
 
-This repository extracts the PR workflow and adapters from yushen-skills.
+The original concept comes from YuShen (@YuShenLiu06)'s yushen-skills project:
+https://github.com/YuShenLiu06/yushen-skills.git
+This repository builds on that work to implement the PR cycle workflow,
+Claude Code integration and Kanban batch tooling as an independent project.
 The original MIT copyright notice is retained in LICENSE.
 
 External runtimes are downloaded separately and are not distributed in this

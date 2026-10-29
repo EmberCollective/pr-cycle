@@ -64,4 +64,6 @@ python -m unittest discover -s tests -v
 
 ## 许可与来源
 
-采用 [MIT](LICENSE)，保留原作者版权。工作流提取自原项目的 `feat/pr-cycle-risk-approval` 分支，具体来源与外部运行时边界见[致谢](ACKNOWLEDGEMENTS.md)和[第三方说明](THIRD_PARTY_NOTICES.txt)。
+本项目的最初构思来源于 YuShen（[@YuShenLiu06](https://github.com/YuShenLiu06)）的 [yushen-skills 项目](https://github.com/YuShenLiu06/yushen-skills.git)，在此基础上实现 PR cycle、看板与 Claude Code 工作流，并作为独立仓库维护。
+
+采用 [MIT](LICENSE)，保留原作者版权。具体来源与外部运行时边界见[致谢](ACKNOWLEDGEMENTS.md)和[第三方说明](THIRD_PARTY_NOTICES.txt)。

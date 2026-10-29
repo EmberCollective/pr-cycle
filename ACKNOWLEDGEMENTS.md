@@ -2,7 +2,7 @@
 
 ## 工作流来源
 
-本仓库从 `lxbsdsg/yushen-skills` 的 `feat/pr-cycle-risk-approval` 分支提交 `a365d12` 提取 PR cycle 工作流、启动适配、批次工具和对应测试，以独立历史维护。原有 MIT 版权声明保留在 [LICENSE](LICENSE)。
+本项目的最初构思来源于 YuShen（[@YuShenLiu06](https://github.com/YuShenLiu06)）的 [yushen-skills 项目](https://github.com/YuShenLiu06/yushen-skills.git)。本仓库在其基础上实现 PR cycle 工作流、Claude Code 启动适配与看板批次工具，配套提供测试，并作为独立项目维护。感谢 YuShen 提供的原始构思与工作方法；原有 MIT 版权声明保留在 [LICENSE](LICENSE)。
 
 开发协调规则、返工总结与 REVIEW 示例来自原项目已获授权的用户自有材料；原项目还核对了公开的 [learning-station 固定版本](https://github.com/YuShenLiu06/learning-station/tree/c566ff841d4cb228fe08dc38c00cf347a0753af5)，其根许可证为 MIT，版权人为 YuShen。未复制学习站程序或其他文档技能。
 
