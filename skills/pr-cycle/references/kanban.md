@@ -10,23 +10,22 @@
 
 ## 启动与建项目
 
-需要 Node.js/npm、Git、Python 3.10+；执行任务时还需要已安装并登录的 Claude Code CLI。协调者循环的 Git Bash、jq 与官方 Ralph 插件准备见 [Claude Code 运行方式](claude-code.md)。第一次启动会从官方源下载固定版本并打开浏览器；仅查看本地看板和导入任务不需要购买云看板，实际 Claude 工作会话按已配置账户计费。
+需要 Node.js/npm、Git、Python 3.10+；执行任务时还需要已安装并登录的 Claude Code CLI。协调者循环的 Git Bash、jq 与官方 Ralph 插件准备见 [Claude Code 运行方式](claude-code.md)。首次运行先构建替换了商业消息列表的本地前端；仅查看本地看板和导入任务不需要购买云看板，实际 Claude 工作会话按已配置账户计费。
 
 在本仓库根目录运行（技能安装到其他位置时替换路径）：
 
 ```powershell
+powershell -NoProfile -File skills/pr-cycle/scripts/setup-kanban-ui.ps1
 powershell -NoProfile -File skills/pr-cycle/scripts/start-kanban.ps1
 ```
 
-默认地址为 `http://127.0.0.1:13680`，用 `-Port 13681` 可改端口。服务在终端运行，Ctrl+C 停止；保持监听在本机，不将未鉴权的本地 API 暴露到公网。首次界面按实际情况完成引导，在 Projects 中选已有本地 Git 仓库或新建项目。不要为已有项目重复创建第二份看板。
+界面和 API/MCP 统一使用 `http://127.0.0.1:13680`，`13681` 兼容入口也显示替换界面。`-Port` 修改公开入口，`-FrontendPort` 修改兼容入口，`-BackendPort` 修改内部后端端口，三者必须不同。服务只监听本机回环地址。Ctrl+C 停止本次创建的服务，不停止复用服务。首次界面按实际情况完成引导，在 Projects 中选已有本地 Git 仓库或新建项目。不要为已有项目重复创建第二份看板。构建、旧入口迁移及回退见[开源前端说明](open-source-ui.md)。
 
 Windows 启动器为看板子进程设置真实 Git Bash 路径，供 `CLAUDE_CODE` 工作者使用，不改系统 PATH。若旧看板已经运行，先确认工作者均已安全结束，再通过本脚本重启；另开协调者不能改变旧看板继承的环境。
 
-macOS / Linux 等价启动命令：
+启动器也会自动配置项目的本地 CLI 适配：Codex / Claude Code 在每次工作者启动时从本机 PATH 发现，沿用本机登录和配置，不再下载看板内置的固定旧 CLI。每台机器独立发现，移动项目后重启会刷新适配脚本绑定。缺失 CLI 时看板仍可查看，对应工作者明确报错。后端启动日志写入 `.pr-cycle-runtime/kanban-backend.log`。协议兼容范围、诊断与回退见[本地 CLI 接入](local-cli.md)。
 
-```sh
-HOST=127.0.0.1 PORT=13680 BACKEND_PORT=13680 npx -y vibe-kanban@0.0.166
-```
+macOS / Linux 手动部署同样应让替换前端作为公开入口，并将原版后端置于内部回环地址；直接运行上游 npm 包仍会打开含商业组件的原版界面。具体端口关系见[开源前端说明](open-source-ui.md)，Unix 部署流程尚未真机验证。
 
 运行器使用系统用户数据目录，持久保存数据库与配置；关闭服务不会清空卡片。该版没有核实过的自定义数据目录或禁浏览器开关，不臆造 `VK_DATA_DIR`、`NO_BROWSER` 等参数。若已有其他版本的数据，先停止服务、备份并确认迁移兼容性，不直接降级打开。
 
@@ -35,6 +34,19 @@ HOST=127.0.0.1 PORT=13680 BACKEND_PORT=13680 npx -y vibe-kanban@0.0.166
 ```powershell
 (Invoke-RestMethod http://127.0.0.1:13680/api/projects).data | Select-Object id,name
 ```
+
+## Codex 继承本机模型配置
+
+`start-kanban.ps1` 已自动移除内置 Codex 预设的旧模型覆盖。若仅需更新模型继承而不调整 CLI 接入，也可在后端运行时执行：
+
+```powershell
+python skills/pr-cycle/scripts/use_local_codex_config.py
+python skills/pr-cycle/scripts/use_local_codex_config.py --check
+```
+
+脚本先备份，再清除 `CODEX` 的 `DEFAULT`、`HIGH`、`APPROVALS`、`MAX` 四个预设中的模型、服务商、Codex profile 和推理参数覆盖。Codex 随后按自身规则读取 `~/.codex/config.toml`（设置了 `CODEX_HOME` 时使用该目录）以及适用的环境和项目配置。以后修改本机模型配置，无需再次同步模型名或复制密钥。`HIGH`、`MAX` 保留预设名称，但推理强度也改为继承本机设置。
+
+权限设置、自定义预设和其他执行器保持原值；备份在忽略目录 `.pr-cycle-runtime/backups/`。`--port` 可指定后端端口。修改对后续启动的 Codex 进程生效，已运行的进程需要结束后重新启动；旧错误日志不会被清除。此设置不改变本工作流默认使用 `CLAUDE_CODE / APPROVALS` 的派发约定。
 
 ## 一次导入整批
 

@@ -15,7 +15,8 @@ $board = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot '../assets/runti
 $source = Join-Path $RuntimePath 'claude-plugins-official'
 $plugin = Join-Path $source $lock.ralph_loop.plugin_path
 $git = (Get-Command git.exe -ErrorAction Stop).Source
-$claude = (Get-Command claude.cmd -ErrorAction Stop).Source
+$node = (Get-Command node.exe -ErrorAction Stop).Source
+$claudeLauncher = Join-Path $PSScriptRoot 'local-cli.mjs'
 $null = Get-Command npx.cmd -ErrorAction Stop
 if (-not (Test-Path -LiteralPath (Join-Path $source '.git'))) { throw 'Run setup-claude-runtime.ps1 first.' }
 $head = & $git -C $source rev-parse HEAD
@@ -49,11 +50,11 @@ try {
     $env:PATH = "$(Join-Path $RuntimePath 'bin');$(Split-Path $bash -Parent);$(Join-Path $gitRoot 'usr/bin');$oldPath"
     & $bash -c 'set -e; command -v bash jq perl sed grep awk >/dev/null; jq --version; perl -e "exit 0"'
     if ($LASTEXITCODE -ne 0) { throw 'Required Ralph hook dependencies are unavailable in Git Bash.' }
-    & $claude --version
+    & $node $claudeLauncher claude --version
     if ($LASTEXITCODE -ne 0) { throw 'Claude Code cannot execute.' }
-    & $claude plugin validate $repoRoot
+    & $node $claudeLauncher claude plugin validate $repoRoot
     if ($LASTEXITCODE -ne 0) { throw 'The pr-cycle plugin manifest is invalid.' }
-    & $claude plugin validate $plugin
+    & $node $claudeLauncher claude plugin validate $plugin
     if ($LASTEXITCODE -ne 0) { throw 'The Ralph plugin manifest is invalid.' }
     try { $response = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/api/projects" -TimeoutSec 5 }
     catch { throw "Vibe Kanban is not reachable on port $Port. Start start-kanban.ps1 -Port $Port first. $($_.Exception.Message)" }
@@ -84,7 +85,7 @@ try {
     [IO.File]::WriteAllText($mcpFile, ($config | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
     Push-Location -LiteralPath $ProjectPath
     $pushed = $true
-    & $claude --plugin-dir $repoRoot --plugin-dir $plugin --mcp-config $mcpFile
+    & $node $claudeLauncher claude --plugin-dir $repoRoot --plugin-dir $plugin --mcp-config $mcpFile
     if ($LASTEXITCODE -ne 0) { throw "Claude Code exited with code $LASTEXITCODE" }
 } finally {
     if ($pushed) { Pop-Location }

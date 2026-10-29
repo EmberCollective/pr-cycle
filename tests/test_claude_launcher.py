@@ -22,7 +22,7 @@ RUNTIME = Path(os.environ.get("PR_CYCLE_RUNTIME", ROOT / ".pr-cycle-runtime"))
 
 
 @unittest.skipUnless(
-    os.name == "nt" and shutil.which("claude.cmd") and (RUNTIME / "bin/jq.exe").is_file(),
+    os.name == "nt" and (shutil.which("claude") or os.environ.get("PR_CYCLE_CLAUDE_PATH")) and (RUNTIME / "bin/jq.exe").is_file(),
     "requires Windows, Claude Code, and the bootstrapped runtime",
 )
 class ClaudeLauncherTests(unittest.TestCase):

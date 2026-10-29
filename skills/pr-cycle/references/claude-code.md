@@ -19,6 +19,7 @@ Ralph 固定在官方仓库提交 `f8c5e7a1dcb71b10cb74586224b5401f3de5db28`，�
 
 ```powershell
 powershell -NoProfile -File skills/pr-cycle/scripts/setup-claude-runtime.ps1
+powershell -NoProfile -File skills/pr-cycle/scripts/setup-kanban-ui.ps1
 ```
 
 脚本将固定版本的官方 Ralph 插件及其所需 jq 准备到本仓库 `.pr-cycle-runtime`，不改用户全局插件或 PATH；版本与校验信息见 [运行锁定文件](../assets/claude-runtime.lock.json)。该目录不进入 Git。自定义位置用 `-RuntimePath`，后续启动传入相同路径。
@@ -29,6 +30,8 @@ powershell -NoProfile -File skills/pr-cycle/scripts/setup-claude-runtime.ps1
 powershell -NoProfile -File skills/pr-cycle/scripts/start-kanban.ps1
 ```
 
+使用 `http://127.0.0.1:13680` 打开替换了商业消息列表的界面；API/MCP 也连接 `13680`，`13681` 保留为兼容界面入口。前端构建与回退见[开源前端说明](open-source-ui.md)。
+
 看板启动器也为其子工作者选择 Git Bash 并设置进程级 `CLAUDE_CODE_GIT_BASH_PATH`。若看板是用旧启动方式打开的，先确认没有活动工作者，再停止旧服务并用上述脚本重启；协调者的环境变量不会追溯传给已经运行的看板。工作者不运行 Ralph，因此不需要加载该插件或为循环配置 jq。
 
 终端二先检查，再进入协调者：
@@ -38,7 +41,7 @@ powershell -NoProfile -File skills/pr-cycle/scripts/start-claude-cycle.ps1 -Chec
 powershell -NoProfile -File skills/pr-cycle/scripts/start-claude-cycle.ps1
 ```
 
-为其他 Git 项目运行时增加 `-ProjectPath 'D:\projects\my-app'`；仍从本集合加载技能，但协调者工作目录和 Ralph 状态属于目标项目。看板须选中该项目，而非自动沿用示例项目。看板与协调者都可传 `-Port 13681`，两处保持一致。
+为其他 Git 项目运行时增加 `-ProjectPath 'D:\projects\my-app'`；仍从本集合加载技能，但协调者工作目录和 Ralph 状态属于目标项目。看板须选中该项目，而非自动沿用示例项目。看板与协调者都可传 `-Port 13780` 修改公开 API 端口，两处保持一致；看板的 `-FrontendPort` 和 `-BackendPort` 必须与该端口不同。
 
 启动器为本次进程选择 Git Bash，避免误用 Windows 的 WSL `bash.exe`；检查 jq 等 hook 依赖并通过 `--plugin-dir` 加载本仓库插件和固定 Ralph 插件，通过 `--mcp-config` 连接看板。不使用跳过权限检查参数。`-CheckOnly` 不开始模型对话、循环或工作者，不能替代登录、MCP 授权和真实任务验收。
 
