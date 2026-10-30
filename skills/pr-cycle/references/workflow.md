@@ -8,6 +8,8 @@
 
 卡片保存当前摘要，PR 保存逐轮发现和提交证据；同一任务键不能创建第二份任务来重置失败或审查轮次。准备阶段尚无 PR 时明确写“未创建”，不将看板 URL 当成 PR URL。
 
+看板额外保留每次原生状态切换的阶段快照，并显示顺序、打回及整合连线，见[流程追踪](workflow-tracking.md)。这些历史节点共享原任务身份，不作为第二份任务参与调度。界面“第 N 轮”是状态回退计数，不替代本协议记录的实际 PR 审查轮次；“已纳入整合”也不替代组合验证或交付。跨任务连线用于追溯，实际派发依赖仍以批次 `depends_on` 与交付证据核实。
+
 批次清单使用 `schema_version: 1`，包含 `batch_id`、`title`、真实 `project_id`、`max_parallel` 和 `tasks`；任务包含 `id`、`title`、`description`、`acceptance`、`depends_on`、`resources`。等级、依据、审批要求及单 PR 计划写入 `description`，不虚构额外 API 字段；批准和审查证据随后追加到卡片。脚本导入时在描述开头写入稳定标记 `[pr-cycle:<batch>:<task>]`，批次卡片的任务键为 `__batch__`。保留前两行标记与定义哈希，勿手工改成另一个任务键。第三行 `[dispatch:ready]` / `[dispatch:hold]` 控制是否参与调度：阻塞子卡或暂停父卡时设为 hold，恢复前复核后改回 ready；阻塞原因写在描述中。P0 缺方案批准时保持 hold，核实用户批准后才恢复 ready。
 
 `scripts/kanban_batch.py` 的 `validate` 校验清单结构，`import` 默认预览、加 `--apply` 才写入看板，`ready` 只读计算建议。脚本不解析等级或批准记录；`ready` 只做依赖、资源与在制任务筛选，不验证 Git 提交可达性、审查、分级审批或真实运行进程，也不会启动代理。协调者须补齐这些核对再派发，不能把脚本给出的 ready 当作 P0 已获批准。

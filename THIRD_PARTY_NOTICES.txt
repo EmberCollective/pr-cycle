@@ -14,6 +14,12 @@ repository. The root MIT license does not relicense these external works:
   upstream checkout, including its original notices and license files.
 - BloopAI/vibe-kanban 0.0.166, pinned to commit
   0c91b082357972dbcfd79c93ab8d899b78181f1a, licensed under Apache-2.0.
+  The optional local frontend build applies the tracked kanban-ui patch and
+  replaces the commercial message-list component. The backend is unmodified.
+  The source license and a modification notice are retained in the build.
+- react-virtuoso, under MIT, resolved by the pinned upstream pnpm lockfile.
+  The local frontend includes its license as REACT-VIRTUOSO-LICENSE.txt.
+  This is the open-source virtualizer, not @virtuoso.dev/message-list.
 - jq, obtained from its official release with a pinned SHA-256 checksum.
   Its upstream notices and applicable license continue to apply.
 - Claude Code, installed and authenticated separately by the user, under
