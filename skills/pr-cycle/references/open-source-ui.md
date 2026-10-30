@@ -24,6 +24,7 @@ powershell -NoProfile -File skills/pr-cycle/scripts/start-kanban.ps1
 - `assets/runtime.lock.json` 固定后端及前端源码提交。`assets/kanban-ui/build.lock.json` 固定源码压缩包 SHA-256 和 pnpm 版本。
 - `assets/kanban-ui/frontend.patch` 修改三个消费者并移除商业依赖，也移除本地构建不需要的上游 Sentry 发布插件。
 - `assets/kanban-ui/MessageList.tsx` 负责将会话更新、定位及可见项查询接到 `react-virtuoso`，保留按需渲染和动态高度测量。
+- `conversation-events.patch` 与 `conversationEntries.ts` 在新旧会话中隐藏 `System: thinking_tokens` 计数通知，并将完整的 `[claude-code:unrecognized_model] {"model":"…","query_source":"sdk"}` 警告显示为普通系统提示，保留原文。旧后端会把标准错误流统一标为错误，但这条 Claude Code 模型识别警告本身不能证明调用失败。包含其他错误的混合日志、实际接口错误及执行失败状态仍保留；原始进程日志不变。这项展示修正不处理服务端响应缺失或中断。
 - `assets/kanban-ui/WorkflowBoard.tsx` 与 `workflow-board.css` 替换任务看板，显示保留的阶段卡片和三类追踪线；准备脚本每次复制这些受版本控制的文件，下载源码不是修改的唯一副本。
 - 历史首次加载定位到底部；输出追加和流式增高在底部时跟随；向上查看历史时保留阅读位置；搜索及“跳转到底部”仍可主动定位。
 - `serve-kanban-ui.mjs` 在 `127.0.0.1` 的三个入口提供构建文件，并透传 HTTP、SSE、WebSocket 到 `127.0.0.2:13682` 的内部原后端。分开的回环地址让后端自动打开的 `127.0.0.1:13682` 也能使用替换界面。保留 Host/Origin 配对并拒绝外部来源；内部后端仍带上游嵌入资源，不作为浏览器入口。
@@ -38,6 +39,7 @@ powershell -NoProfile -File skills/pr-cycle/scripts/start-kanban.ps1
 ```powershell
 python -m unittest discover -s tests -v
 node --test tests/test_kanban_ui_proxy.mjs
+node --test tests/test_conversation_entries.mjs
 powershell -NoProfile -File skills/pr-cycle/scripts/test-kanban-ui.ps1
 ```
 

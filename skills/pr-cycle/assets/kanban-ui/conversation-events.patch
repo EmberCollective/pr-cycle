@@ -1,0 +1,38 @@
+--- a/frontend/src/hooks/useConversationHistory/useConversationHistoryOld.ts
++++ b/frontend/src/hooks/useConversationHistory/useConversationHistoryOld.ts
+@@ -9,6 +9,7 @@
+ import { useExecutionProcessesContext } from '@/contexts/ExecutionProcessesContext';
+ import { useCallback, useEffect, useMemo, useRef } from 'react';
+ import { streamJsonPatchEntries } from '@/utils/streamJsonPatchEntries';
++import { presentConversationEntries } from '@/utils/conversationEntries';
+ import type {
+   AddEntryType,
+   ExecutionProcessStateStore,
+@@ -346,7 +347,7 @@
+         );
+       }
+
+-      return allEntries;
++      return presentConversationEntries(allEntries);
+     },
+     []
+   );
+--- a/frontend/src/components/ui-new/hooks/useConversationHistory.ts
++++ b/frontend/src/components/ui-new/hooks/useConversationHistory.ts
+@@ -11,6 +11,7 @@
+ import { useEntries } from '@/contexts/EntriesContext';
+ import { useCallback, useEffect, useMemo, useRef } from 'react';
+ import { streamJsonPatchEntries } from '@/utils/streamJsonPatchEntries';
++import { presentConversationEntries } from '@/utils/conversationEntries';
+ import type {
+   AddEntryType,
+   ExecutionProcessStateStore,
+@@ -383,7 +384,7 @@
+       // Update token usage info in context
+       setTokenUsageInfo(latestTokenUsageInfo);
+
+-      return allEntries;
++      return presentConversationEntries(allEntries);
+     },
+     [setTokenUsageInfo]
+   );
