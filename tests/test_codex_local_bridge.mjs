@@ -39,6 +39,26 @@ test('resume uses the forked rollout path and errors are forwarded with the orig
   assert.deepEqual(f.down[0], { id: 'resume', error });
 });
 
+test('pinned Kanban review/start reaches Codex and preserves result/error routing', () => {
+  // The pinned backend uses v2's slash-separated review method even though its
+  // conversation methods are v1. These are ReviewStartParams from its schema.
+  const params = { threadId: 'review-thread', target: { type: 'custom', instructions: 'Review this branch' }, delivery: null };
+  for (const response of [
+    { result: { reviewThreadId: 'review-thread', turn: { id: 'review-turn', status: 'inProgress', items: [], error: null } } },
+    { error: { code: -32602, message: 'Review target is unavailable' } },
+  ]) {
+    const f = fixture();
+    f.bridge.fromClient({ id: 'review-client', method: 'review/start', params });
+    assert.equal(f.up.length, 1);
+    assert.equal(f.up[0].method, 'review/start');
+    assert.deepEqual(f.up[0].params, params);
+    assert.deepEqual(f.down, [], 'wait for the real server response');
+    f.bridge.fromServer({ id: f.up[0].id, ...response });
+    assert.deepEqual(f.down, [{ id: 'review-client', ...response }]);
+    assert.deepEqual(f.failures, []);
+  }
+});
+
 test('does not expose auth tokens or silently drop unsupported settings', () => {
   const f = fixture();
   f.bridge.fromClient({ id: 1, method: 'getAuthStatus', params: { includeToken: true } });

@@ -10,6 +10,8 @@
 
 点击「追踪」高亮该节点所在的关联路径；点击历史卡片查看当时的标题、说明、时间和轮次。当前卡片仍支持原有详情、操作菜单与拖动。工具栏可筛选任务、分别隐藏三类线条、折叠历史；隐藏端点时也隐藏对应线条并显示数量提示，展开即可恢复。
 
+删除最后一个原生任务后，项目仍显示保留的历史卡片和连线，刷新页面后也可查看。没有任务或历史的新项目显示空看板，并保留「新建任务」入口。
+
 任务关联是流程证据，不启动工作者、不改变调度依赖或状态。实际顺序执行仍需在批次清单的 `depends_on` 中声明，并由协调者核实依赖交付；整合仍需执行组合验证和适用审批。手工关联不允许同一任务自连、跨项目关联或任务间循环。误建的手工关联可在连线详情中移除；自动流转连线不能删除，可补充说明。
 
 ## 安装与持久化
@@ -37,8 +39,11 @@ Windows 默认数据库是 `%APPDATA%\bloop\vibe-kanban\data\db.sqlite`。`-Runt
 python -m unittest discover -s tests -p test_kanban_tracking.py -v
 node --test tests/test_kanban_tracking_api.mjs tests/test_kanban_ui_proxy.mjs
 node tests/test_workflow_board_browser.mjs
+node tests/test_workflow_history_page_browser.mjs
 ```
 
 浏览器测试需要已构建前端、本机 Edge 和 `.pr-cycle-runtime/ui-tests` 内的 Playwright（可先运行 `scripts/test-kanban-ui.ps1` 准备）。测试使用临时数据库、模拟原生任务写入与真实追踪 API，不修改用户任务，不启动 AI 工作者。截图保存在忽略目录 `.pr-cycle-runtime/workflow-board.png`。
+
+`test_workflow_history_page_browser.mjs` 验证实际构建页面的空列表分支，需要已启动新版看板且至少有一个项目（默认 `http://127.0.0.1:13680`，可用 `PR_CYCLE_UI_URL` 指定）。它在浏览器中模拟任务删除和历史数据，拦截所有 HTTP 写请求，不删除真实任务、不修改服务端配置。
 
 恢复旧前端不会删除记录，数据库触发器仍会记录任务变化。若必须完全停用追踪，先停看板和工作者并备份，再仅删除四个 `pr_cycle_task_*` 触发器；保留 `pr_cycle_nodes`、`pr_cycle_edges` 和元数据以便回看。停用后产生的变化无法补录，不应将这种数据库直接当作连续历史恢复使用。不要将旧备份直接覆盖包含后续任务变更的数据库。

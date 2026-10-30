@@ -92,9 +92,8 @@ export class CodexBridge {
           mapped = 'turn/start';
           data = { threadId: params.conversationId, input: params.items };
           break;
-        case 'reviewStart':
+        case 'review/start':
           this.active();
-          mapped = 'review/start';
           break;
         case 'getAuthStatus':
           // Vibe only checks the auth mode; do not expose a token to its raw logs.

@@ -39,17 +39,19 @@ Copy-Item -LiteralPath (Join-Path $assets 'MessageList.tsx') -Destination (Join-
 Copy-Item -LiteralPath (Join-Path $assets 'WorkflowBoard.tsx') -Destination (Join-Path $source 'frontend/src/components/tasks/TaskKanbanBoard.tsx')
 Copy-Item -LiteralPath (Join-Path $assets 'workflow-board.css') -Destination (Join-Path $source 'frontend/src/components/tasks/workflow-board.css')
 Copy-Item -LiteralPath (Join-Path $assets 'conversationEntries.ts') -Destination (Join-Path $source 'frontend/src/utils/conversationEntries.ts')
-$conversationPatch = Join-Path $assets 'conversation-events.patch'
-$savedPreference = $ErrorActionPreference
-$ErrorActionPreference = 'Continue'
-& $git -C $source apply --reverse --check $conversationPatch 2>$null
-$conversationPatched = $LASTEXITCODE -eq 0
-$ErrorActionPreference = $savedPreference
-if (-not $conversationPatched) {
-    & $git -C $source apply --check $conversationPatch
-    if ($LASTEXITCODE -ne 0) { throw 'Conversation source differs from the pinned patch; preserve changes before rebuilding.' }
-    & $git -C $source apply $conversationPatch
-    if ($LASTEXITCODE -ne 0) { throw 'Could not apply conversation event display patch.' }
+foreach ($patchName in @('conversation-events.patch', 'workflow-page.patch')) {
+    $uiPatch = Join-Path $assets $patchName
+    $savedPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    & $git -C $source apply --reverse --check $uiPatch 2>$null
+    $uiPatched = $LASTEXITCODE -eq 0
+    $ErrorActionPreference = $savedPreference
+    if (-not $uiPatched) {
+        & $git -C $source apply --check $uiPatch
+        if ($LASTEXITCODE -ne 0) { throw "Frontend source differs from $patchName; preserve changes before rebuilding." }
+        & $git -C $source apply $uiPatch
+        if ($LASTEXITCODE -ne 0) { throw "Could not apply $patchName." }
+    }
 }
 Push-Location -LiteralPath $source
 try {
