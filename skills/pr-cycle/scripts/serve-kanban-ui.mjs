@@ -4,6 +4,7 @@ import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
+import { handleTrackingRequest } from './kanban-tracking-api.mjs';
 
 const mimeTypes = {
   '.html': 'text/html; charset=utf-8',
@@ -23,7 +24,7 @@ const mimeTypes = {
   '.txt': 'text/plain; charset=utf-8',
 };
 
-export function createUiServer({ dist, backendPort, backendHost = '127.0.0.1' }) {
+export function createUiServer({ dist, backendPort, backendHost = '127.0.0.1', tracking }) {
   if (!['127.0.0.1', '127.0.0.2'].includes(backendHost)) throw new Error('Backend must use a loopback address.');
   const root = path.resolve(dist);
   const sockets = new Set();
@@ -52,7 +53,11 @@ export function createUiServer({ dist, backendPort, backendHost = '127.0.0.1' })
     }
     if (req.url === '/__pr_cycle_ui') {
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-      res.end(JSON.stringify({ component: 'react-virtuoso', backendPort, backendHost }));
+      res.end(JSON.stringify({ component: 'react-virtuoso', backendPort, backendHost, tracking: Boolean(tracking), trackingDatabase: tracking?.database ?? null }));
+      return;
+    }
+    if (req.url.split('?')[0] === '/api/pr-cycle/tracking') {
+      await handleTrackingRequest(req, res, tracking);
       return;
     }
     if (req.url === '/api' || req.url.startsWith('/api/')) {
@@ -154,6 +159,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     'backend-port': { type: 'string', default: '13680' },
     'backend-host': { type: 'string', default: '127.0.0.1' },
     'alias-port': { type: 'string', multiple: true, default: [] },
+    'tracking-db': { type: 'string' },
+    python: { type: 'string', default: 'python' },
   } });
   const port = Number(values.port);
   const backendPort = Number(values['backend-port']);
@@ -166,7 +173,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   if (!values.dist || !existsSync(path.join(values.dist, 'index.html'))) {
     throw new Error('Build the frontend with setup-kanban-ui.ps1 first.');
   }
-  const servers = ports.map(() => createUiServer({ dist: values.dist, backendPort, backendHost }));
+  // The launcher installs tracking after the backend has initialized a fresh DB.
+  const tracking = { database: values['tracking-db'], python: values.python };
+  const servers = ports.map(() => createUiServer({ dist: values.dist, backendPort, backendHost, tracking }));
   const shutdown = () => servers.forEach((server) => server.shutdown());
   servers.forEach((server, index) => {
     server.on('error', (error) => { console.error(error.message); process.exitCode = 1; shutdown(); });

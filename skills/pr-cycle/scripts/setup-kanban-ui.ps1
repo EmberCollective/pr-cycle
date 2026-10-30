@@ -36,6 +36,8 @@ if (-not $alreadyPatched) {
     if ($LASTEXITCODE -ne 0) { throw 'Could not apply open-source message list patch.' }
 }
 Copy-Item -LiteralPath (Join-Path $assets 'MessageList.tsx') -Destination (Join-Path $source 'frontend/src/components/common/MessageList.tsx')
+Copy-Item -LiteralPath (Join-Path $assets 'WorkflowBoard.tsx') -Destination (Join-Path $source 'frontend/src/components/tasks/TaskKanbanBoard.tsx')
+Copy-Item -LiteralPath (Join-Path $assets 'workflow-board.css') -Destination (Join-Path $source 'frontend/src/components/tasks/workflow-board.css')
 Push-Location -LiteralPath $source
 try {
     & $npx -y "pnpm@$($build.pnpm_version)" --filter ./frontend install --frozen-lockfile

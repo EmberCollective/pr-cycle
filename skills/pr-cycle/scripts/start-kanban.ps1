@@ -3,6 +3,7 @@ param(
     [ValidateRange(1024, 65535)][int]$FrontendPort = 13681,
     [ValidateRange(1024, 65535)][int]$BackendPort = 13682,
     [string]$RuntimePath,
+    [string]$TrackingDatabase,
     [switch]$BackendOnly
 )
 $ErrorActionPreference = 'Stop'
@@ -13,6 +14,8 @@ $uiProcess = $null
 $backendProcess = $null
 $node = (Get-Command node.exe -ErrorAction Stop).Source
 $python = (Get-Command python.exe -ErrorAction Stop).Source
+if (-not $TrackingDatabase) { $TrackingDatabase = Join-Path $env:APPDATA 'bloop/vibe-kanban/data/db.sqlite' }
+$TrackingDatabase = [IO.Path]::GetFullPath($TrackingDatabase)
 $null = Get-Command npx.cmd -ErrorAction Stop
 $apiHost = if ($BackendOnly) { '127.0.0.1' } else { '127.0.0.2' }
 $apiPort = if ($BackendOnly) { $Port } else { $BackendPort }
@@ -56,16 +59,18 @@ try {
         $existingUi = $null
         try { $existingUi = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/__pr_cycle_ui" -TimeoutSec 2 } catch {}
         if ($existingUi) {
-            if ($existingUi.component -ne 'react-virtuoso' -or $existingUi.backendPort -ne $apiPort -or $existingUi.backendHost -ne $apiHost) {
+            if ($existingUi.component -ne 'react-virtuoso' -or $existingUi.backendPort -ne $apiPort -or $existingUi.backendHost -ne $apiHost -or -not $existingUi.tracking -or $existingUi.trackingDatabase -ne $TrackingDatabase) {
                 throw "Port $Port still belongs to an older server. Finish active workers and stop the old launcher before migrating this entry point."
             }
         } else {
             # Listen before spawning the backend: its automatic browser URL must serve the replacement.
-            $uiProcess = Start-Process -FilePath $node -ArgumentList @(
+            $trackingArgs = @('--python', ('"' + $python + '"'))
+            if ($TrackingDatabase) { $trackingArgs += @('--tracking-db', ('"' + $TrackingDatabase + '"')) }
+            $uiProcess = Start-Process -FilePath $node -ArgumentList (@(
                 ('"' + $uiScript + '"'), '--dist', ('"' + $dist + '"'), '--port', [string]$Port,
                 '--alias-port', [string]$FrontendPort, '--alias-port', [string]$BackendPort,
                 '--backend-port', [string]$apiPort, '--backend-host', $apiHost
-            ) -WindowStyle Hidden -PassThru
+            ) + $trackingArgs) -WindowStyle Hidden -PassThru
             $null = $uiProcess.Handle
         }
         foreach ($entryPort in $publicPorts) {
@@ -101,6 +106,12 @@ try {
         if (-not $existingBackend -or -not $existingBackend.success -or $existingBackend.data.config.last_app_version -ne $runtime.version) {
             throw "Pinned backend did not become ready. See $backendErrorLog"
         }
+    }
+    if (-not $BackendOnly) {
+        $trackingArgs = @('--install')
+        if ($TrackingDatabase) { $trackingArgs += @('--db', $TrackingDatabase) }
+        & $python (Join-Path $PSScriptRoot 'kanban_tracking.py') @trackingArgs
+        if ($LASTEXITCODE -ne 0) { throw 'Workflow tracking setup failed; database was not replaced.' }
     }
     & $python (Join-Path $PSScriptRoot 'use_local_clis.py') --port $Port
     if ($LASTEXITCODE -ne 0) { throw 'Local CLI setup failed; see the diagnostic above before starting workers.' }

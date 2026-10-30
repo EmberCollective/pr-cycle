@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import shutil
 import socket
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -81,6 +82,10 @@ class KanbanLocalStartupTests(unittest.TestCase):
             dist = runtime / f'vibe-kanban-{commit}/frontend/dist'
             dist.mkdir(parents=True)
             (dist / 'index.html').write_text('<html>replacement frontend</html>')
+            tracking_db = folder / 'test-tracking.sqlite'
+            db = sqlite3.connect(tracking_db)
+            db.execute('CREATE TABLE tasks(id BLOB PRIMARY KEY,project_id BLOB,title TEXT,description TEXT,status TEXT)')
+            db.close()
             # Substitute only npx in the child's PATH; never start a second real DB server.
             backend = folder / 'fake_backend.py'
             backend.write_text('''import json,os,threading
@@ -105,7 +110,7 @@ server.serve_forever();server.server_close()
                    'PR_CYCLE_CODEX_PATH': str(folder / 'missing-codex.exe'),
                    'PR_CYCLE_CLAUDE_PATH': str(folder / 'missing-claude.exe')}
             with (folder / 'launcher.log').open('w', encoding='utf-8') as log:
-                mode_args = ['-BackendOnly'] if backend_only else ['-FrontendPort', str(extra_ports[0]), '-BackendPort', str(extra_ports[1])]
+                mode_args = ['-BackendOnly'] if backend_only else ['-FrontendPort', str(extra_ports[0]), '-BackendPort', str(extra_ports[1]), '-TrackingDatabase', str(tracking_db)]
                 proc = subprocess.Popen(['powershell', '-NoProfile', '-File', str(SCRIPT), *mode_args,
                                          '-Port', str(port), '-RuntimePath', str(runtime)],
                                         stdout=log, stderr=log, env=env)

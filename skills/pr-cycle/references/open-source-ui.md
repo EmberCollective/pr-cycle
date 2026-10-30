@@ -24,9 +24,12 @@ powershell -NoProfile -File skills/pr-cycle/scripts/start-kanban.ps1
 - `assets/runtime.lock.json` 固定后端及前端源码提交。`assets/kanban-ui/build.lock.json` 固定源码压缩包 SHA-256 和 pnpm 版本。
 - `assets/kanban-ui/frontend.patch` 修改三个消费者并移除商业依赖，也移除本地构建不需要的上游 Sentry 发布插件。
 - `assets/kanban-ui/MessageList.tsx` 负责将会话更新、定位及可见项查询接到 `react-virtuoso`，保留按需渲染和动态高度测量。
+- `assets/kanban-ui/WorkflowBoard.tsx` 与 `workflow-board.css` 替换任务看板，显示保留的阶段卡片和三类追踪线；准备脚本每次复制这些受版本控制的文件，下载源码不是修改的唯一副本。
 - 历史首次加载定位到底部；输出追加和流式增高在底部时跟随；向上查看历史时保留阅读位置；搜索及“跳转到底部”仍可主动定位。
 - `serve-kanban-ui.mjs` 在 `127.0.0.1` 的三个入口提供构建文件，并透传 HTTP、SSE、WebSocket 到 `127.0.0.2:13682` 的内部原后端。分开的回环地址让后端自动打开的 `127.0.0.1:13682` 也能使用替换界面。保留 Host/Origin 配对并拒绝外部来源；内部后端仍带上游嵌入资源，不作为浏览器入口。
 - 构建产物位于 `.pr-cycle-runtime/vibe-kanban-<commit>/frontend/dist`。商业包文本检查、Apache-2.0 与 react-virtuoso MIT 许可副本随本地构建生成。不提交下载的源码、依赖或二进制。
+
+流程历史由本地 SQLite 触发器持久化，界面通过代理的追踪接口读取。首次安装备份、数据库位置、整合操作及兼容性见[流程追踪](workflow-tracking.md)。旧版代理需要重启后才能提供新接口；新版启动器会识别旧代理并提示。
 
 参考了 [agent-orchestrator 的滚动行为](https://github.com/OrchestratorInc/agent-orchestrator/blob/96cd425bd33a5187ff5891731cc7114fe12a7ed6/frontend/src/renderer/hooks/useScrollFollow.ts)：用户阅读历史时保持控制权，流式增量不反复启动平滑动画。本实现使用 react-virtuoso 自身的测量和跟随机制，没有复制该项目源码。
 

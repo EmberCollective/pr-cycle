@@ -23,6 +23,8 @@ powershell -NoProfile -File skills/pr-cycle/scripts/start-kanban.ps1
 
 界面使用 MIT 许可的 `react-virtuoso` 消息列表，无需 Virtuoso Message List 商业密钥。`13680` 统一提供界面、API 和 MCP；`13681` 兼容地址及后端自动打开的地址也提供同一替换界面。数据库和工作区保持原位。构建、旧入口迁移与维护见[开源看板前端](skills/pr-cycle/references/open-source-ui.md)。
 
+看板保留每次阶段流转的历史卡片，用连线追踪顺序执行、打回返工和多个小改动整合。历史不重复创建任务，刷新和重启后仍可查看；首次启用会先备份数据库。用法与存储说明见[流程追踪](skills/pr-cycle/references/workflow-tracking.md)。
+
 启动器自动接入每台机器 PATH 中的 Codex / Claude Code；每次工作者启动都重新发现本机 CLI，沿用其登录与配置。仓库不固定工作者 CLI 版本、安装路径或模型，未安装时会提示，不自动下载替代版本。换电脑后安装并配置自己的 CLI，再运行同一启动脚本即可。实现参考 agent-orchestrator，详见[本地 CLI 接入](skills/pr-cycle/references/local-cli.md)。
 
 终端二检查环境并启动协调者，将目标路径替换为要开发的 Git 项目：
@@ -65,8 +67,10 @@ python skills/pr-cycle/scripts/kanban_batch.py ready batch.json
 ```powershell
 python -m unittest discover -s tests -v
 node --test tests/test_kanban_ui_proxy.mjs
+node --test tests/test_kanban_tracking_api.mjs
 node --test tests/test_local_cli_resolution.mjs tests/test_local_cli_shutdown.mjs tests/test_codex_local_bridge.mjs tests/test_codex_bridge_shutdown.mjs
 powershell -NoProfile -File skills/pr-cycle/scripts/test-kanban-ui.ps1
+node tests/test_workflow_board_browser.mjs
 ```
 
 看板测试使用本地模拟服务；Ralph hook 集成测试需要准备固定运行时；启动器测试还需要 Windows 和 Claude Code CLI。消息列表浏览器测试需要已构建前端及本机 Edge。缺少可选环境时 Python 测试会显示跳过。测试不启动模型会话或真实 AI 工作者。
