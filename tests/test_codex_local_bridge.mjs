@@ -59,6 +59,53 @@ test('pinned Kanban review/start reaches Codex and preserves result/error routin
   }
 });
 
+test('pinned v1 sendUserMessage payloads become v2 input in order without changing content', () => {
+  // v1 InputItem uses serde's content="data", including for denial feedback.
+  const items = [
+    { type: 'text', data: { text: '修复\n  keep whitespace 😀' } },
+    { type: 'image', data: { image_url: 'data:image/png;base64,AA==' } },
+    { type: 'localImage', data: { path: 'C:/images/a b.png' } },
+    { type: 'text', data: { text: '' } },
+  ];
+  const original = structuredClone(items);
+  for (const response of [
+    { result: { turn: { id: 'turn-a', status: 'inProgress' } } },
+    { error: { code: -32602, message: 'Thread not found' } },
+  ]) {
+    const f = fixture();
+    f.bridge.fromClient({ id: 'message-client', method: 'sendUserMessage', params: { conversationId: 'thread-a', items } });
+    assert.equal(f.up.length, 1);
+    assert.equal(f.up[0].method, 'turn/start');
+    assert.deepEqual(f.up[0].params, { threadId: 'thread-a', input: [
+      { type: 'text', text: items[0].data.text },
+      { type: 'image', url: items[1].data.image_url },
+      { type: 'localImage', path: items[2].data.path },
+      { type: 'text', text: '' },
+    ] });
+    f.bridge.fromServer({ id: f.up[0].id, ...response });
+    assert.deepEqual(f.down, [{ id: 'message-client', ...(response.error ? response : { result: {} }) }]);
+    assert.deepEqual(f.failures, []);
+  }
+  assert.deepEqual(items, original);
+});
+
+test('invalid legacy input is rejected without forwarding partial messages or echoing content', () => {
+  for (const items of [undefined, {}, [null], [{ type: 'text' }],
+    [{ type: 'text', data: { text: 123 } }], [{ type: 'image', data: {} }],
+    [{ type: 'localImage', data: { path: null } }],
+    [{ type: 'unknown-sensitive-input', data: { text: 'private content' } }],
+    [{ type: 'text', data: { text: 'private content' } }, { type: 'image' }],
+  ]) {
+    const f = fixture();
+    f.bridge.fromClient({ id: 'invalid', method: 'sendUserMessage', params: { conversationId: 'thread-a', items } });
+    assert.deepEqual(f.up, []);
+    assert.equal(f.bridge.pending.size, 0);
+    assert.equal(f.down[0].id, 'invalid');
+    assert.equal(f.down[0].error.code, -32602);
+    assert.doesNotMatch(f.down[0].error.message, /private content|unknown-sensitive-input/);
+  }
+});
+
 test('does not expose auth tokens or silently drop unsupported settings', () => {
   const f = fixture();
   f.bridge.fromClient({ id: 1, method: 'getAuthStatus', params: { includeToken: true } });

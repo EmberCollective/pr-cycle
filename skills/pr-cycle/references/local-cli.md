@@ -31,6 +31,10 @@ python skills/pr-cycle/scripts/use_local_clis.py
 python skills/pr-cycle/scripts/use_local_clis.py --executor codex
 ```
 
+启动接入同时检查本项目管理的 Codex 预设所用的本地配置，尊重各预设的 `CODEX_HOME` 和 CLI 路径。如果根配置包含 `disable_response_storage`，会用本机 CLI 和隔离的测试配置检查支持情况。只有 CLI 明确报告该项未知时，才备份原文件并移除该项；仍支持它、无法确认、文件只读或存在并发修改时保留原文件。检查不调用模型。已有自定义启动命令不参与适配。
+
+备份位于原配置旁，名称为 `config.toml.before-pr-cycle-compat-*.bak`。迁移保留其他设置、注释和换行格式，不屏蔽其他配置诊断，也不声称实现该失效选项原本表达的存储策略。`--check` 只预览，不写入配置或创建备份。自动迁移需要 Python 3.11+，或 Python 3.10 安装 `tomli`；缺少解析器时会提示并保留配置，看板仍可启动。
+
 `--port` 指定后端端口。非标准安装可在启动看板前设置 `PR_CYCLE_CODEX_PATH` / `PR_CYCLE_CLAUDE_PATH`，值为该机器上的绝对可执行文件或 JS 入口路径；这些环境变量不写入仓库。未知的 Windows shell shim 不会被当作任意 shell 命令执行，应指定实际入口。
 
 脚本会备份 profiles，更新后重新读取校验，并检测保存前的并发修改。已有自定义命令和自定义预设保持原值；本项目管理的内置配置带 `env.PR_CYCLE_LOCAL_CLI=1` 标记，并在 `env.PR_CYCLE_LOCAL_CLI_COMMAND` 记录上次生成的命令。只有命令未被修改时，移动项目才会自动更新绑定；在看板保存自定义命令后，后续启动会保留该预设的全部设置。旧版仅有标记的配置会按完整适配器命令格式识别迁移，无法确认的自定义命令保持原值。备份在忽略目录 `.pr-cycle-runtime/backups/`，可能包含原有执行器环境设置，不应提交。
@@ -48,7 +52,7 @@ python skills/pr-cycle/scripts/use_local_clis.py --executor codex
 
 ## 验证与回退
 
-离线测试覆盖两套不同机器安装目录、PATH 切换、项目移动、缺失 CLI、审批转换，以及启动器创建/复用后端：
+离线测试覆盖两套不同机器安装目录、PATH 切换、项目移动、缺失 CLI、审批转换，以及启动器创建/复用后端。消息输入使用旧版看板实际的 `data.text`、`data.image_url`、`data.path` 格式，验证转换为新版字段并保留内容与顺序：
 
 进程退出测试还覆盖正常 EOF、忽略 EOF、错误退出码、缓冲消息，以及主进程退出后仍运行的子进程。EOF 和信号清理已在 WSL/Linux 实测，包含子进程关闭标准流的场景；这不代表完整 macOS/Linux 看板启动流程已验证。
 
@@ -57,7 +61,15 @@ node --test tests/test_local_cli_resolution.mjs tests/test_local_cli_shutdown.mj
 python -m unittest discover -s tests -v
 ```
 
-真实 Codex 测试会产生两次简短模型请求和原生测试会话，使用临时 Git 仓库验证新建、复制记录后续接及上下文保持：
+只检查本机 Codex 的输入协议、不调用模型或创建会话：
+
+```powershell
+python tests/smoke_local_codex.py --protocol-only
+```
+
+该检查通过桥接器发送旧版文本、图片及本地图片输入，使用未加载的随机线程 ID。预期返回线程不存在，证明已通过输入解析；出现 `missing field` 则表示桥接转换仍有问题。它不验证模型响应。
+
+完整的真实 Codex 测试会产生两次简短模型请求和原生测试会话，使用临时 Git 仓库验证新建、复制记录后续接及上下文保持：
 
 ```powershell
 python tests/smoke_local_codex.py

@@ -2,6 +2,8 @@
 
 python tests/smoke_local_codex.py [--cli /path/to/codex]
 Uses an isolated scratch repository and creates native Codex test sessions.
+Add --protocol-only to check input parsing against the installed app-server
+using a nonexistent thread (no sessions or model requests).
 """
 import argparse
 import json
@@ -65,7 +67,7 @@ class Client:
 
     def turn(self, thread_id, prompt):
         self.call('addConversationListener', {'conversationId': thread_id})
-        self.call('sendUserMessage', {'conversationId': thread_id, 'items': [{'type': 'text', 'text': prompt}]})
+        self.call('sendUserMessage', {'conversationId': thread_id, 'items': [{'type': 'text', 'data': {'text': prompt}}]})
         while True:
             value = self.receive()
             if value.get('method') == 'codex/event/task_complete':
@@ -88,9 +90,33 @@ class Client:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cli')
+    parser.add_argument('--protocol-only', action='store_true')
     args = parser.parse_args()
     _, version = discover_cli('codex', args.cli)
     with tempfile.TemporaryDirectory(prefix='pr-cycle-cli-') as temp:
+        if args.protocol_only:
+            client = Client(args.cli, temp)
+            try:
+                # A fresh app-server has no loaded threads. A thread lookup
+                # failure proves deserialization succeeded without starting a turn.
+                thread_id = str(uuid.uuid4())
+                for item in [
+                    {'type': 'text', 'data': {'text': '协议检查 😀\n'}},
+                    {'type': 'image', 'data': {'image_url': 'data:image/png;base64,AA=='}},
+                    {'type': 'localImage', 'data': {'path': str(Path(temp) / 'unused.png')}},
+                ]:
+                    try:
+                        client.call('sendUserMessage', {'conversationId': thread_id, 'items': [item]})
+                    except RuntimeError as error:
+                        if 'thread not found' not in str(error).lower():
+                            raise
+                    else:
+                        raise AssertionError('Unexpectedly accepted a nonexistent thread')
+                    print(f'Legacy {item["type"]} input parsed: PASS')
+                print(f'Protocol check: PASS ({version}; no model requests)')
+            finally:
+                client.close()
+            return
         subprocess.run(['git', 'init', '-q', temp], check=True)
         options = {'cwd': temp, 'sandbox': 'read-only', 'approvalPolicy': 'on-request',
                    'baseInstructions': 'Transport verification only. Never use tools. Follow the requested exact output.'}

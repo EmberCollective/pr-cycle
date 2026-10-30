@@ -16,6 +16,7 @@ import subprocess
 import urllib.request
 
 from use_local_codex_config import MODEL_FIELDS, VARIANTS
+from codex_config_compat import adapt_codex_config
 
 ROOT = Path(__file__).resolve().parents[3]
 BRIDGE = Path(__file__).with_name("codex-local-bridge.mjs")
@@ -96,6 +97,23 @@ def update_profiles(original, commands, legacy_commands=None):
     return updated, changed, skipped
 
 
+def adapt_managed_codex_configs(profiles, command, *, check=False):
+    """Honor each managed preset's CLI and CODEX_HOME, including env overrides."""
+    seen = set()
+    for preset in profiles.get('executors', {}).get('CODEX', {}).values():
+        config = preset.get('CODEX', {})
+        if not command or config.get('base_command_override') != command:
+            continue
+        env = {**os.environ, **(config.get('env') or {})}
+        identity = (env.get('CODEX_HOME'), env.get('PR_CYCLE_CODEX_PATH'), env.get('PATH'), env.get('Path'))
+        if identity in seen:
+            continue
+        seen.add(identity)
+        probe = probe_clis('codex', env)['codex']
+        if probe['available']:
+            adapt_codex_config(probe, env, check=check)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=13680)
@@ -144,6 +162,7 @@ def main():
         print(f"Local CLI: {item}")
     for item in skipped:
         print(f"Preserved: {item}")
+    adapt_managed_codex_configs(updated, commands.get('CODEX'), check=args.check)
     if args.check or updated == original:
         print("Preview only." if args.check else "Already configured.")
         return

@@ -32,6 +32,26 @@ export function fileChanges(changes = []) {
   ]));
 }
 
+function userInput(items) {
+  if (!Array.isArray(items)) throw new Error('Legacy message items must be an array.');
+  return items.map((item, index) => {
+    // v1 InputItem nests its payload under data; v2 UserInput is flat and
+    // renames image_url to url. Do not forward the old tagged enum unchanged.
+    switch (item?.type) {
+      case 'text':
+        if (typeof item.data?.text === 'string') return { type: 'text', text: item.data.text };
+        break;
+      case 'image':
+        if (typeof item.data?.image_url === 'string') return { type: 'image', url: item.data.image_url };
+        break;
+      case 'localImage':
+        if (typeof item.data?.path === 'string') return { type: 'localImage', path: item.data.path };
+        break;
+    }
+    throw new Error(`Invalid or unsupported legacy message item at index ${index}.`);
+  });
+}
+
 export class CodexBridge {
   constructor({ upstream, downstream, fatal, interrupted = () => {}, active = () => {} }) {
     Object.assign(this, { upstream, downstream, fatal, interrupted, active });
@@ -88,9 +108,9 @@ export class CodexBridge {
           this.downstream({ id, result: { subscriptionId: randomUUID() } });
           return;
         case 'sendUserMessage':
-          this.active();
           mapped = 'turn/start';
-          data = { threadId: params.conversationId, input: params.items };
+          data = { threadId: params.conversationId, input: userInput(params.items) };
+          this.active();
           break;
         case 'review/start':
           this.active();

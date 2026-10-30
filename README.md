@@ -27,6 +27,8 @@ powershell -NoProfile -File skills/pr-cycle/scripts/start-kanban.ps1
 
 启动器自动接入每台机器 PATH 中的 Codex / Claude Code；每次工作者启动都重新发现本机 CLI，沿用其登录与配置。仓库不固定工作者 CLI 版本、安装路径或模型，未安装时会提示，不自动下载替代版本。换电脑后安装并配置自己的 CLI，再运行同一启动脚本即可。实现参考 agent-orchestrator，详见[本地 CLI 接入](skills/pr-cycle/references/local-cli.md)。
 
+启动时会自动检查已失效的 Codex `disable_response_storage` 配置：仅在本机 CLI 明确不支持时备份并移除，其他设置保留。自动迁移需要 Python 3.11+ 或 `tomli`；`use_local_clis.py --check` 可预览。
+
 终端二检查环境并启动协调者，将目标路径替换为要开发的 Git 项目：
 
 ```powershell
