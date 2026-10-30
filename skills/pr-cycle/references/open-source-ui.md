@@ -27,6 +27,7 @@ powershell -NoProfile -File skills/pr-cycle/scripts/start-kanban.ps1
 - `conversation-events.patch` 与 `conversationEntries.ts` 在新旧会话中隐藏 `System: thinking_tokens` 计数通知，并将完整的 `[claude-code:unrecognized_model] {"model":"…","query_source":"sdk"}` 警告显示为普通系统提示，保留原文。旧后端会把标准错误流统一标为错误，但这条 Claude Code 模型识别警告本身不能证明调用失败。包含其他错误的混合日志、实际接口错误及执行失败状态仍保留；原始进程日志不变。这项展示修正不处理服务端响应缺失或中断。
 - `assets/kanban-ui/WorkflowBoard.tsx` 与 `workflow-board.css` 替换任务看板，显示保留的阶段卡片和三类追踪线；准备脚本每次复制这些受版本控制的文件，下载源码不是修改的唯一副本。
 - `assets/kanban-ui/workflow-page.patch` 调整项目页面的空列表分支，无当前任务时仍挂载追踪看板，以便回看已删除任务的历史。
+- `assets/kanban-ui/workflow-search.patch` 在上述页面补丁之后应用，将完整任务集合和搜索词交给追踪看板，统一检索当前任务与历史。准备脚本识别已应用的最终补丁，支持旧构建升级和重复执行。
 - 历史首次加载定位到底部；输出追加和流式增高在底部时跟随；向上查看历史时保留阅读位置；搜索及“跳转到底部”仍可主动定位。
 - `serve-kanban-ui.mjs` 在 `127.0.0.1` 的三个入口提供构建文件，并透传 HTTP、SSE、WebSocket 到 `127.0.0.2:13682` 的内部原后端。分开的回环地址让后端自动打开的 `127.0.0.1:13682` 也能使用替换界面。保留 Host/Origin 配对并拒绝外部来源；内部后端仍带上游嵌入资源，不作为浏览器入口。
 - 构建产物位于 `.pr-cycle-runtime/vibe-kanban-<commit>/frontend/dist`。商业包文本检查、Apache-2.0 与 react-virtuoso MIT 许可副本随本地构建生成。不提交下载的源码、依赖或二进制。

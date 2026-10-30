@@ -50,6 +50,7 @@ interface Props {
   selectedTaskId?: string;
   onCreateTask?: () => void;
   projectId: string;
+  searchQuery?: string;
 }
 const statuses: TaskStatus[] = [
   'todo',
@@ -130,6 +131,7 @@ export default function WorkflowBoard({
   selectedTaskId,
   onCreateTask,
   projectId,
+  searchQuery = '',
 }: Props) {
   const client = useQueryClient();
   const query = useQuery({
@@ -179,15 +181,29 @@ export default function WorkflowBoard({
     setError('');
   }, [projectId]);
 
+  const search = searchQuery.trim().toLowerCase();
+  const matches = (item: { title: string; description: string | null }) =>
+    item.title.toLowerCase().includes(search) ||
+    (item.description ?? '').toLowerCase().includes(search);
+  // Match current text and retained snapshots, then keep the whole task path.
+  const matchingTaskIds = new Set([
+    ...[...tasks.values()].filter(matches).map((task) => task.id),
+    ...graph.nodes.filter(matches).map((node) => node.task_id),
+  ]);
+  const visibleTasks = [...tasks.values()].filter(
+    (task) => !search || matchingTaskIds.has(task.id)
+  );
   const eligible = graph.nodes.filter(
-    (n) => tasks.has(n.task_id) || !n.task_exists
+    (n) =>
+      (tasks.has(n.task_id) || !n.task_exists) &&
+      (!search || matchingTaskIds.has(n.task_id))
   );
   const nodes = eligible.filter(
     (n) =>
       (!filter || n.task_id === filter) && (!collapsed || n.exited_at === null)
   );
   const { positions, height } = layoutNodes(nodes);
-  const current = graph.nodes.filter(
+  const current = eligible.filter(
     (n) => n.exited_at === null && n.task_exists && tasks.has(n.task_id)
   );
   const byId = new Map(graph.nodes.map((n) => [n.id, n]));
@@ -243,7 +259,7 @@ export default function WorkflowBoard({
         <div>
           <strong>流程追踪</strong>
           <span className="workflow-muted">
-            阶段留痕 · 任务 {tasks.size} · 历史节点{' '}
+            阶段留痕 · 任务 {visibleTasks.length} · 历史节点{' '}
             {eligible.filter((n) => n.exited_at).length}
           </span>
         </div>
@@ -337,7 +353,13 @@ export default function WorkflowBoard({
                 <KanbanBoard id={status} className="workflow-column">
                   <div className="workflow-column-heading">
                     {labels[status]}{' '}
-                    <small>{columns[status]?.length ?? 0} 项当前任务</small>
+                    <small>
+                      {
+                        visibleTasks.filter((task) => task.status === status)
+                          .length
+                      }{' '}
+                      项当前任务
+                    </small>
                   </div>
                   {nodes
                     .filter((n) => n.status === status)
@@ -525,7 +547,9 @@ export default function WorkflowBoard({
           </svg>
           {!query.isLoading && !query.error && nodes.length === 0 && (
             <p className="workflow-empty">
-              暂无可显示的阶段记录。新建任务或调整筛选后查看。
+              {search
+                ? '没有匹配的当前任务或历史记录。请调整搜索或筛选条件。'
+                : '暂无可显示的阶段记录。新建任务或调整筛选后查看。'}
             </p>
           )}
         </div>

@@ -24,7 +24,8 @@ let tasks = { [taskId]: task };
 let graph = {
   nodes: ['todo', 'inprogress'].map((status, index) => ({
     id: index + 1, task_id: taskId, project_id: projectId,
-    status, title: task.title, description: task.description,
+    status, title: index === 0 ? 'Original design' : task.title,
+    description: index === 0 ? 'Legacy acceptance evidence' : task.description,
     round: 1, entered_at: timestamp, exited_at: index === 0 ? timestamp : null,
     baseline: 0, task_exists: 1,
   })),
@@ -69,6 +70,16 @@ try {
   await page.locator('.workflow-current').waitFor();
   assert.equal(await page.locator('[data-trace-node]').count(), 2);
 
+  const search = page.getByPlaceholder(/^Search/);
+  await search.fill('original DESIGN');
+  await page.locator('.workflow-current').waitFor();
+  assert.equal(await page.locator('[data-trace-node]').count(), 2, 'historical titles retain the current card and whole path');
+  await search.fill('  LEGACY acceptance  ');
+  await page.locator('.workflow-current').waitFor();
+  assert.equal(await page.locator('[data-trace-edge]').count(), 1);
+  await search.fill(task.title);
+  await page.locator('.workflow-current').waitFor();
+
   // Simulate the native last-task deletion plus its persisted trigger results.
   tasks = {};
   graph = { ...graph, nodes: graph.nodes.map(n => ({ ...n, exited_at: timestamp, task_exists: 0 })) };
@@ -76,15 +87,30 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('.workflow-history').length === 2);
   assert.equal(await page.locator('.workflow-current').count(), 0);
   assert.equal(await page.locator('[data-trace-edge]').count(), 1);
+  assert.equal(await search.inputValue(), task.title, 'deletion must not clear the active search');
+
+  // Unrelated deleted history must not bypass the search filter.
+  graph.nodes.push({ ...graph.nodes[0], id: 3, task_id: '22222222-2222-4222-8222-000000000002', title: 'Unrelated work', description: null });
+  await page.getByRole('button', { name: '刷新', exact: true }).click();
+  await page.waitForFunction(() => document.querySelectorAll('[data-trace-node]').length === 2);
+  await search.fill('no-such-task-or-snapshot');
+  await page.locator('.workflow-empty').waitFor();
+  assert.equal(await page.locator('.workflow').count(), 1);
+  assert.equal(await page.locator('[data-trace-node]').count(), 0);
+  assert.match(await page.locator('.workflow-empty').innerText(), /没有匹配/);
+  await search.fill('');
+  await page.waitForFunction(() => document.querySelectorAll('[data-trace-node]').length === 3);
+  await search.fill('legacy acceptance');
+  await page.waitForFunction(() => document.querySelectorAll('[data-trace-node]').length === 2);
 
   // A fresh navigation must still mount the board with no native tasks at all.
   await openPage();
   await page.locator('.workflow-history').first().waitFor();
-  assert.equal(await page.locator('.workflow-history').count(), 2);
+  assert.equal(await page.locator('.workflow-history').count(), 3);
   await page.locator('.workflow-snapshot').first().click();
   const history = page.getByRole('dialog', { name: '阶段历史' });
   await history.waitFor();
-  assert.match(await history.innerText(), /Retained stage evidence/);
+  assert.match(await history.innerText(), /Legacy acceptance evidence/);
   assert.equal(await history.getByRole('button', { name: '打开当前任务' }).count(), 0);
   await history.getByRole('button', { name: 'Close', exact: true }).click();
 
@@ -95,5 +121,5 @@ try {
   assert.equal(await page.locator('[data-trace-node]').count(), 0);
   assert.equal(await page.getByRole('button', { name: '新建任务', exact: true }).isEnabled(), true);
   assert.deepEqual(errors, []);
-  console.log('PASS real ProjectTasks page: last-task deletion retains history/edges; reload and snapshot inspection work; empty project can create a task. No backend writes.');
+  console.log('PASS real ProjectTasks page: current/historical title and description search, deletion with active search, unrelated deleted history excluded, no-match and clear, reload, snapshot inspection and empty-project creation entry. No backend writes.');
 } finally { await browser.close(); }

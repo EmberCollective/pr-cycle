@@ -1,0 +1,76 @@
+--- a/frontend/src/pages/ProjectTasks.tsx
++++ b/frontend/src/pages/ProjectTasks.tsx
+@@ -1,7 +1,6 @@
+ import { useCallback, useEffect, useMemo } from 'react';
+ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+ import { useTranslation } from 'react-i18next';
+-import { Card, CardContent } from '@/components/ui/card';
+ import { AlertTriangle } from 'lucide-react';
+ import { Loader } from '@/components/ui/loader';
+ import { tasksApi } from '@/lib/api';
+@@ -164,6 +163,7 @@
+   const {
+     tasks,
+     tasksById,
++    tasksByStatus,
+     isLoading,
+     error: streamError,
+   } = useProjectTasks(projectId || '');
+@@ -426,14 +426,6 @@
+     return map;
+   }, [kanbanColumns]);
+
+-  const hasVisibleTasks = useMemo(
+-    () =>
+-      Object.values(visibleTasksByStatus).some(
+-        (items) => items && items.length > 0
+-      ),
+-    [visibleTasksByStatus]
+-  );
+-
+   useKeyNavUp(
+     () => {
+       selectPreviousTask();
+@@ -749,29 +741,19 @@
+       : `${truncated}...`;
+   };
+
+-  const kanbanContent =
+-    hasSearch && !hasVisibleTasks ? (
+-      <div className="max-w-7xl mx-auto mt-8">
+-        <Card>
+-          <CardContent className="text-center py-8">
+-            <p className="text-muted-foreground">
+-              {t('empty.noSearchResults')}
+-            </p>
+-          </CardContent>
+-        </Card>
+-      </div>
+-    ) : (
+-      <div className="w-full h-full overflow-x-auto overflow-y-auto overscroll-x-contain">
+-        <TaskKanbanBoard
+-          columns={kanbanColumns}
+-          onDragEnd={handleDragEnd}
+-          onViewTaskDetails={handleViewTaskDetails}
+-          selectedTaskId={selectedTask?.id}
+-          onCreateTask={handleCreateNewTask}
+-          projectId={projectId!}
+-        />
+-      </div>
+-    );
++  const kanbanContent = (
++    <div className="w-full h-full overflow-x-auto overflow-y-auto overscroll-x-contain">
++      <TaskKanbanBoard
++        columns={tasksByStatus}
++        searchQuery={searchQuery}
++        onDragEnd={handleDragEnd}
++        onViewTaskDetails={handleViewTaskDetails}
++        selectedTaskId={selectedTask?.id}
++        onCreateTask={handleCreateNewTask}
++        projectId={projectId!}
++      />
++    </div>
++  );
+
+   const rightHeader = selectedTask ? (
+     <NewCardHeader
