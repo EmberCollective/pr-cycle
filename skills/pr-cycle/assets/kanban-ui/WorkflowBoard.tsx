@@ -14,35 +14,12 @@ import {
 } from '@/components/ui/shadcn-io/kanban';
 import { TaskCard } from './TaskCard';
 import type { TaskStatus, TaskWithAttemptStatus } from 'shared/types';
+import { WorkflowSettings, WorkflowTaskDialog, workflowRequest } from './WorkflowControls';
+import { stageLabels, statuses, nativeStage, workflowGraph, type WorkflowData, type TraceNode, type TraceEdge, type TraceGraph } from './workflow-model';
+export type { TraceNode, TraceEdge, TraceGraph } from './workflow-model';
 import './workflow-board.css';
 
 export type KanbanColumns = Record<TaskStatus, TaskWithAttemptStatus[]>;
-export interface TraceNode {
-  id: number;
-  task_id: string;
-  project_id: string;
-  status: TaskStatus;
-  title: string;
-  description: string | null;
-  round: number;
-  entered_at: string;
-  exited_at: string | null;
-  baseline: number;
-  task_exists: number;
-}
-export interface TraceEdge {
-  id: number;
-  source: number;
-  target: number;
-  kind: 'sequence' | 'return' | 'integrate';
-  note: string;
-  automatic: number;
-  created_at: string;
-}
-export interface TraceGraph {
-  nodes: TraceNode[];
-  edges: TraceEdge[];
-}
 interface Props {
   columns: KanbanColumns;
   onDragEnd: (event: DragEndEvent) => void;
@@ -52,20 +29,8 @@ interface Props {
   projectId: string;
   searchQuery?: string;
 }
-const statuses: TaskStatus[] = [
-  'todo',
-  'inprogress',
-  'inreview',
-  'done',
-  'cancelled',
-];
-const labels: Record<TaskStatus, string> = {
-  todo: '待办',
-  inprogress: '进行中',
-  inreview: '审查',
-  done: '完成',
-  cancelled: '取消',
-};
+const labels = { ...stageLabels, inprogress: '实施', inreview: '人类审查' };
+const EMPTY_WORKFLOWS: WorkflowData = { workflows: [], settings: { prompts: {} } };
 const kinds = {
   sequence: '顺序执行',
   return: '打回返工',
@@ -114,7 +79,7 @@ export function layoutNodes(nodes: TraceNode[]) {
     let row = 0;
     let previous = -1;
     for (const node of group) {
-      const column = statuses.indexOf(node.status);
+      const column = statuses.indexOf(nativeStage(node.status));
       if (column <= previous) row++;
       positions.set(node.id, { x: 24 + column * 340, y: base + row * 220 });
       previous = column;
@@ -140,7 +105,17 @@ export default function WorkflowBoard({
     refetchInterval: 2500,
     retry: false,
   });
-  const graph = query.data ?? EMPTY;
+  const flowQuery = useQuery<WorkflowData>({
+    queryKey: ['workflow-state', projectId],
+    queryFn: ({ signal }) => workflowRequest(projectId, undefined, signal),
+    refetchInterval: 2500, retry: false,
+  });
+  const flowData = flowQuery.data ?? EMPTY_WORKFLOWS;
+  const workflows = new Map(flowData.workflows.map(w => [w.task_id, w]));
+  const graph = workflowGraph(query.data ?? EMPTY, flowData.workflows);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [workflowTaskId, setWorkflowTaskId] = useState<string | null>(null);
+  const refresh = async () => { await Promise.all([query.refetch(), flowQuery.refetch()]); };
   const [filter, setFilter] = useState('');
   const [focused, setFocused] = useState<number | null>(null);
   const [collapsed, setCollapsed] = useState(false);
@@ -179,6 +154,8 @@ export default function WorkflowBoard({
     setEdge(null);
     setRelationOpen(false);
     setError('');
+    setSettingsOpen(false);
+    setWorkflowTaskId(null);
   }, [projectId]);
 
   const search = searchQuery.trim().toLowerCase();
@@ -203,7 +180,7 @@ export default function WorkflowBoard({
       (!filter || n.task_id === filter) && (!collapsed || n.exited_at === null)
   );
   const { positions, height } = layoutNodes(nodes);
-  const current = eligible.filter(
+  const current = (query.data?.nodes ?? []).filter(
     (n) => n.exited_at === null && n.task_exists && tasks.has(n.task_id)
   );
   const byId = new Map(graph.nodes.map((n) => [n.id, n]));
@@ -264,6 +241,13 @@ export default function WorkflowBoard({
           </span>
         </div>
         <div className="workflow-controls">
+          <button onClick={onCreateTask}>新建任务</button>
+          <button onClick={() => void refresh()}>刷新</button>
+          <button onClick={() => setSettingsOpen(true)}>设置</button>
+        </div>
+        {settingsOpen && <WorkflowSettings open onOpenChange={setSettingsOpen} projectId={projectId}
+          prompts={flowData.settings.prompts} refresh={refresh}>
+        <div className="workflow-controls">
           <label>
             任务{' '}
             <select
@@ -311,6 +295,7 @@ export default function WorkflowBoard({
               setTarget('');
               setNote('');
               setError('');
+              setSettingsOpen(false);
               setRelationOpen(true);
             }}
             disabled={!query.data || current.length < 2}
@@ -318,9 +303,8 @@ export default function WorkflowBoard({
             关联任务
           </button>
           <button onClick={() => setFocused(null)}>显示全部路径</button>
-          <button onClick={() => void query.refetch()}>刷新</button>
-          <button onClick={onCreateTask}>新建任务</button>
         </div>
+        </WorkflowSettings>}
         {hiddenEdges > 0 && (
           <small className="workflow-muted">
             当前筛选或折叠隐藏了 {hiddenEdges}{' '}
@@ -328,6 +312,7 @@ export default function WorkflowBoard({
           </small>
         )}
         {query.isLoading && <p role="status">正在读取流程记录…</p>}
+        {flowQuery.error && <p role="alert">{flowQuery.error.message} <button onClick={() => void flowQuery.refetch()}>重试流程服务</button></p>}
         {query.error && (
           <p role="alert">
             {query.error.message}。
@@ -337,11 +322,12 @@ export default function WorkflowBoard({
         {error && !edge && !relationOpen && <p role="alert">{error}</p>}
       </div>
       <div className="workflow-scroll">
-        <div className="workflow-canvas" style={{ height }}>
+        <div className="workflow-canvas" style={{ height, width: statuses.length * 340 + 20 }}>
           <KanbanProvider
             className="workflow-provider"
             onDragEnd={(event) => {
-              if (query.data) onDragEnd(event);
+              if (event.over?.id === 'todo' && !workflows.has(String(event.active.id))) onDragEnd(event);
+              else if (event.over && event.over.id !== event.active.data.current?.status) setError('请打开卡片，通过阶段操作推进流程；不能拖拽跳过审批或审查。');
             }}
           >
             {statuses.map((status, column) => (
@@ -355,7 +341,7 @@ export default function WorkflowBoard({
                     {labels[status]}{' '}
                     <small>
                       {
-                        visibleTasks.filter((task) => task.status === status)
+                        visibleTasks.filter((task) => (workflows.get(task.id)?.stage ?? nativeStage(task.status)) === status)
                           .length
                       }{' '}
                       项当前任务
@@ -367,7 +353,7 @@ export default function WorkflowBoard({
                       const position = positions.get(node.id)!;
                       const task = tasks.get(node.task_id);
                       const active =
-                        !node.exited_at && task?.status === node.status;
+                        !node.exited_at && task && (workflows.get(task.id)?.stage ?? nativeStage(task.status)) === node.status;
                       const dimmed =
                         connected.size > 0 && !connected.has(node.id);
                       return (
@@ -388,7 +374,7 @@ export default function WorkflowBoard({
                                 : node.exited_at
                                   ? '历史'
                                   : '同步中'}{' '}
-                              · 第 {node.round} 轮
+                              · 第 {node.round} 轮 {node.risk && <span className={`workflow-risk workflow-risk-${node.risk}`}>{node.risk}</span>}
                             </span>
                             <button
                               aria-label={`追踪 ${node.title} 第 ${node.round} 轮`}
@@ -397,11 +383,11 @@ export default function WorkflowBoard({
                               追踪
                             </button>
                           </div>
-                          {active && task ? (
+                          {active && task && status === 'todo' ? (
                             <TaskCard
                               task={task}
                               index={index}
-                              status={status}
+                              status="todo"
                               onViewDetails={(t) => {
                                 setFocused(node.id);
                                 onViewTaskDetails(t);
@@ -414,13 +400,15 @@ export default function WorkflowBoard({
                               className="workflow-snapshot"
                               onClick={() => {
                                 setFocused(node.id);
-                                setHistory(node);
+                                if (active && task) setWorkflowTaskId(task.id);
+                                else setHistory(node);
                               }}
                             >
-                              <strong>{node.title}</strong>
-                              <span>{node.description || '暂无阶段说明'}</span>
+                              <strong>{node.status === 'todo' ? node.title : `${labels[node.status]}摘要`}</strong>
+                              <span>{node.status === 'todo' ? node.description || '暂无任务说明' : node.summary || '尚无阶段摘要，点击查看完整任务与历史。'}</span>
                             </button>
                           )}
+                          {active && task && status === 'todo' && <button className="workflow-plan-entry" onClick={() => setWorkflowTaskId(task.id)}>规划任务</button>}
                           <div className="workflow-node-footer">
                             <span>{time(node.entered_at)}</span>
                             {(integratedNodes.has(node.id) ||
@@ -444,7 +432,7 @@ export default function WorkflowBoard({
           </KanbanProvider>
           <svg
             className="workflow-lines"
-            width="1720"
+            width={statuses.length * 340 + 20}
             height={height}
             aria-label="流程连线"
           >
@@ -490,6 +478,12 @@ export default function WorkflowBoard({
                     key={e.id}
                     data-trace-edge={e.kind}
                     opacity={dimmed ? 0.15 : 1}
+                    role="button" tabIndex={0} className="workflow-edge-label"
+                    aria-label={`${kinds[e.kind]}：${byId.get(e.source)?.title} → ${byId.get(e.target)?.title}`}
+                    onClick={() => { setEdge(e); setNote(e.note); setError(''); }}
+                    onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault(); setEdge(e); setNote(e.note); setError('');
+                    } }}
                   >
                     <path
                       d={d}
@@ -511,36 +505,7 @@ export default function WorkflowBoard({
                       strokeDasharray={e.kind === 'return' ? '7 5' : undefined}
                       markerEnd={`url(#workflow-arrow-${e.kind})`}
                     />
-                    <g
-                      role="button"
-                      tabIndex={0}
-                      aria-label={`${kinds[e.kind]}：${byId.get(e.source)?.title} → ${byId.get(e.target)?.title}`}
-                      className="workflow-edge-label"
-                      transform={`translate(${(x1 + x2) / 2 + (sameColumn ? 33 : 0)},${(y1 + y2) / 2 - 18})`}
-                      onClick={() => {
-                        setEdge(e);
-                        setNote(e.note);
-                        setError('');
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault();
-                          setEdge(e);
-                          setNote(e.note);
-                          setError('');
-                        }
-                      }}
-                    >
-                      <title>{e.note || kinds[e.kind]}</title>
-                      <rect x="-37" y="-11" width="74" height="22" rx="7" />
-                      <text
-                        textAnchor="middle"
-                        dominantBaseline="central"
-                        fill={colors[e.kind]}
-                      >
-                        {kinds[e.kind]}
-                      </text>
-                    </g>
+                    <title>{`${kinds[e.kind]}${e.note ? `：${e.note}` : ''}`}</title>
                   </g>
                 );
               })}
@@ -554,6 +519,11 @@ export default function WorkflowBoard({
           )}
         </div>
       </div>
+      {workflowTaskId && tasks.has(workflowTaskId) && <WorkflowTaskDialog key={workflowTaskId}
+        task={tasks.get(workflowTaskId)!} workflow={workflows.get(workflowTaskId)} projectId={projectId}
+        refresh={refresh} onClose={() => setWorkflowTaskId(null)} onOpenTask={() => {
+          onViewTaskDetails(tasks.get(workflowTaskId)!); setWorkflowTaskId(null);
+        }} />}
       <Dialog
         role="dialog"
         aria-modal="true"
@@ -580,7 +550,9 @@ export default function WorkflowBoard({
               {Boolean(history.baseline) && (
                 <p>此节点为追踪起点，此前历史未记录。</p>
               )}
-              <pre>{history.description || '暂无阶段说明'}</pre>
+              {history.summary && <section><strong>阶段摘要</strong><pre>{history.summary}</pre></section>}
+              <strong>任务详情与阶段记录</strong><pre>{history.description || '暂无阶段说明'}</pre>
+              {tasks.has(history.task_id) && <pre>{tasks.get(history.task_id)?.description}</pre>}
               {tasks.has(history.task_id) && (
                 <button
                   onClick={() => {
@@ -725,13 +697,14 @@ export default function WorkflowBoard({
                 <textarea
                   aria-label="连线说明"
                   value={note}
+                  readOnly={edge.id < 0}
                   maxLength={4000}
                   onChange={(e) => setNote(e.target.value)}
                 />
               </label>
               {error && <p role="alert">{error}</p>}
               <button
-                disabled={saving}
+                disabled={saving || edge.id < 0}
                 onClick={() =>
                   void save({ action: 'annotate', edge_id: edge.id, note })
                 }
