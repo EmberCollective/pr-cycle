@@ -2,11 +2,11 @@
 
 使用 Claude Code、官方 Ralph Loop 和 Vibe Kanban，将已确认的软件需求推进为可验证、可审查的 PR。
 
-本仓库包含 PR 工作流、看板批次工具、Windows 启动脚本及测试。支持依赖与资源冲突检查、默认最多 3 个工作会话、独立审查和 P0～P3 分级审批。Ralph 默认最多 20 次循环，每个 PR 最多三轮审查；合并由人工决定。
+本仓库提供受控任务看板：所有等级先批准计划，再实施、独立功能审查、独立安全审查、创建 PR 和最终人工审查。规划与实施共用主 Agent，实施可以分派子 Agent；P2 多子 PR 集成后重新双审，再提交总 PR。
 
 ## 快速开始
 
-运行环境：Windows x64、已安装并登录的 Claude Code（也可在看板使用 Codex）、Git for Windows、Node.js/npm、Python 3.10+。
+运行环境：Windows x64、已安装并登录的 Claude Code、Git for Windows、Node.js/npm、Python 3.10+。自动 PR 和合并还需要已授权的 GitHub CLI；当前受控流程支持单仓库 GitHub 项目。
 
 ```powershell
 git clone https://github.com/lxbsdsg/pr-cycle.git
@@ -23,9 +23,11 @@ powershell -NoProfile -File skills/pr-cycle/scripts/start-kanban.ps1
 
 界面使用 MIT 许可的 `react-virtuoso` 消息列表，无需 Virtuoso Message List 商业密钥。`13680` 统一提供界面、API 和 MCP；`13681` 兼容地址及后端自动打开的地址也提供同一替换界面。数据库和工作区保持原位。构建、旧入口迁移与维护见[开源看板前端](skills/pr-cycle/references/open-source-ui.md)。
 
-看板保留每次阶段流转的历史卡片，用连线追踪顺序执行、打回返工和多个小改动整合。历史不重复创建任务，刷新和重启后仍可查看；首次启用会先备份数据库。用法与存储说明见[流程追踪](skills/pr-cycle/references/workflow-tracking.md)。
+在待办卡片点击“规划任务”，再点击“开始任务并授权规划”。规划 Agent 生成 P0～P3 等级、依据、实施计划及子任务依赖，人类在独立的“规划审查”面板批准。之后后台自动完成子任务、主实施、独立双审、返工及 PR；P2 多子 PR 自动集成并复审，最后进入独立的“最终审查”面板。看板服务运行时无需保持浏览器打开。所有等级最终都需要人类批准当前版本，再明确执行合并。完整操作和支持边界见[受控工作流](skills/pr-cycle/references/workflow.md)。
 
-启动器自动接入每台机器 PATH 中的 Codex / Claude Code；每次工作者启动都重新发现本机 CLI，沿用其登录与配置。仓库不固定工作者 CLI 版本、安装路径或模型，未安装时会提示，不自动下载替代版本。换电脑后安装并配置自己的 CLI，再运行同一启动脚本即可。实现参考 agent-orchestrator，详见[本地 CLI 接入](skills/pr-cycle/references/local-cli.md)。
+待办保留任务正文，后续卡片显示阶段摘要，点击可查看完整任务和证据。蓝线表示顺序或整合、红色虚线表示返工；历史折叠、筛选、关联和阶段提示词收进“设置”。提示词在计划批准时冻结，模板修改只影响下一次批准。历史保留并可在重启后查看。
+
+启动器自动接入每台机器 PATH 中的 Codex / Claude Code；每次工作者启动都重新发现本机 CLI，沿用其登录与配置。仓库不固定工作者 CLI 版本、安装路径或模型，未安装时会提示，不自动下载替代版本。受控阶段目前仅启用 Claude Code；Codex 接入仍保留，但其外部 MCP 工具隔离尚未验证，不能用于此流程。换电脑后安装并配置自己的 CLI，再运行同一启动脚本即可。实现参考 agent-orchestrator，详见[本地 CLI 接入](skills/pr-cycle/references/local-cli.md)。
 
 启动时会自动检查已失效的 Codex `disable_response_storage` 配置：仅在本机 CLI 明确不支持时备份并移除，其他设置保留。自动迁移需要 Python 3.11+ 或 `tomli`；`use_local_clis.py --check` 可预览。
 
@@ -60,7 +62,7 @@ python skills/pr-cycle/scripts/kanban_batch.py ready batch.json
 - [Claude Code 启动、停止与恢复](skills/pr-cycle/references/claude-code.md)
 - [看板接入](skills/pr-cycle/references/kanban.md)
 - [跨机器复用本地 CLI](skills/pr-cycle/references/local-cli.md)
-- [固定工作流](skills/pr-cycle/references/workflow.md)
+- [受控工作流与支持边界](skills/pr-cycle/references/workflow.md)
 - [工作者契约](skills/pr-cycle/references/task-contract.md)
 - [项目审查示例](skills/pr-cycle/references/REVIEW.example.md)
 
@@ -73,9 +75,13 @@ node --test tests/test_kanban_tracking_api.mjs
 node --test tests/test_local_cli_resolution.mjs tests/test_local_cli_shutdown.mjs tests/test_codex_local_bridge.mjs tests/test_codex_bridge_shutdown.mjs
 powershell -NoProfile -File skills/pr-cycle/scripts/test-kanban-ui.ps1
 node tests/test_workflow_board_browser.mjs
+node tests/test_workflow_actions_browser.mjs
+node --test tests/test_workflow_model.mjs tests/test_kanban_workflow_api.mjs tests/test_workflow_orchestration.mjs tests/test_workflow_git.mjs
 ```
 
-看板测试使用本地模拟服务；Ralph hook 集成测试需要准备固定运行时；启动器测试还需要 Windows 和 Claude Code CLI。消息列表浏览器测试需要已构建前端及本机 Edge。缺少可选环境时 Python 测试会显示跳过。测试不启动模型会话或真实 AI 工作者。
+看板测试使用本地模拟服务；Ralph hook 集成测试需要准备固定运行时；启动器测试还需要 Windows 和 Claude Code CLI。消息列表浏览器测试需要已构建前端及本机 Edge。缺少可选环境时 Python 测试会显示跳过。测试不启动模型会话或真实 AI 工作者。真实模型、远端 PR 创建、集成发布与最终合并尚未完成端到端验收。
+
+受控入口和数据库许可提供应用级门禁，不是同一操作系统用户之间的身份隔离，也不能证明请求一定来自真人。后台对受控工作会话限制最多 3 个并发；连续三轮返工未通过会暂停，检查原因后须明确恢复。暂停仅停止新增派发，不终止已运行 Agent。跨批次资源和费用仍由协调者管理。
 
 ## 许可与来源
 
