@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { handleTrackingRequest } from './kanban-tracking-api.mjs';
+import { createWorkflowService, handleWorkflowRequest } from './kanban-workflow-api.mjs';
 
 const mimeTypes = {
   '.html': 'text/html; charset=utf-8',
@@ -24,12 +25,13 @@ const mimeTypes = {
   '.txt': 'text/plain; charset=utf-8',
 };
 
-export function createUiServer({ dist, backendPort, backendHost = '127.0.0.1', tracking }) {
+export function createUiServer({ dist, backendPort, backendHost = '127.0.0.1', tracking, workflowService }) {
   if (!['127.0.0.1', '127.0.0.2'].includes(backendHost)) throw new Error('Backend must use a loopback address.');
   const root = path.resolve(dist);
   const sockets = new Set();
   const upstreamSockets = new Set();
   const server = http.createServer(handleRequest);
+  const workflow = workflowService ?? (tracking && createWorkflowService({ config: tracking, backendHost, backendPort }));
 
   function allowed(req) {
     const port = server.address()?.port;
@@ -53,11 +55,25 @@ export function createUiServer({ dist, backendPort, backendHost = '127.0.0.1', t
     }
     if (req.url === '/__pr_cycle_ui') {
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-      res.end(JSON.stringify({ component: 'react-virtuoso', backendPort, backendHost, tracking: Boolean(tracking), trackingDatabase: tracking?.database ?? null }));
+      res.end(JSON.stringify({ component: 'react-virtuoso', backendPort, backendHost, workflow: Boolean(workflow), tracking: Boolean(tracking), trackingDatabase: tracking?.database ?? null }));
       return;
     }
     if (req.url.split('?')[0] === '/api/pr-cycle/tracking') {
       await handleTrackingRequest(req, res, tracking);
+      return;
+    }
+    if (req.url.split('?')[0] === '/api/pr-cycle/workflow' && workflow) {
+      await handleWorkflowRequest(req, res, workflow);
+      return;
+    }
+    const route = req.url.split('?')[0].replace(/\/$/, '');
+    if (workflow && !['GET', 'HEAD'].includes(req.method) && (
+      route === '/api/task-attempts' || route === '/api/tasks/create-and-start' ||
+      /^\/api\/sessions\/[^/]+\/(follow-up|review|queue)$/.test(route) ||
+      /^\/api\/task-attempts\/[^/]+\/(merge|pr|push|rebase|change-target-branch|rename-branch)(\/.*)?$/.test(route))) {
+      res.writeHead(409, { 'Content-Type': 'application/json; charset=utf-8' }).end(JSON.stringify({
+        success: false, message: '请从阶段卡片操作：规划须人工批准，实施和两项独立审查通过后才能提交或合并 PR。',
+      }));
       return;
     }
     if (req.url === '/api' || req.url.startsWith('/api/')) {
@@ -175,8 +191,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   }
   // The launcher installs tracking after the backend has initialized a fresh DB.
   const tracking = { database: values['tracking-db'], python: values.python };
-  const servers = ports.map(() => createUiServer({ dist: values.dist, backendPort, backendHost, tracking }));
-  const shutdown = () => servers.forEach((server) => server.shutdown());
+  const workflowService = createWorkflowService({ config: tracking, backendHost, backendPort });
+  const servers = ports.map(() => createUiServer({ dist: values.dist, backendPort, backendHost, tracking, workflowService }));
+  workflowService.startScheduler();
+  const shutdown = () => { workflowService.stopScheduler(); servers.forEach((server) => server.shutdown()); };
   servers.forEach((server, index) => {
     server.on('error', (error) => { console.error(error.message); process.exitCode = 1; shutdown(); });
     server.listen(ports[index], '127.0.0.1', () => {

@@ -1,0 +1,103 @@
+--- a/frontend/src/components/dialogs/tasks/TaskFormDialog.tsx
++++ b/frontend/src/components/dialogs/tasks/TaskFormDialog.tsx
+@@ -16,7 +16,6 @@
+ import { Input } from '@/components/ui/input';
+ import { Button } from '@/components/ui/button';
+ import { Label } from '@/components/ui/label';
+-import { Switch } from '@/components/ui/switch';
+ import {
+   Select,
+   SelectContent,
+@@ -88,7 +87,7 @@
+   const editMode = mode === 'edit';
+   const modal = useModal();
+   const { t } = useTranslation(['tasks', 'common']);
+-  const { createTask, createAndStart, updateTask } =
++  const { createTask, updateTask } =
+     useTaskMutations(projectId);
+   const { system, profiles, loading: userSystemLoading } = useUserSystem();
+   const { upload, uploadForTask } = useImageUpload();
+@@ -145,7 +144,7 @@
+           status: 'todo',
+           executorProfileId: baseProfile,
+           repoBranches: defaultRepoBranches,
+-          autoStart: true,
++          autoStart: false,
+         };
+ 
+       case 'subtask':
+@@ -157,7 +156,7 @@
+           status: 'todo',
+           executorProfileId: baseProfile,
+           repoBranches: defaultRepoBranches,
+-          autoStart: true,
++          autoStart: false,
+         };
+     }
+   }, [mode, props, system.config?.executor_profile, defaultRepoBranches]);
+@@ -191,23 +190,7 @@
+         image_ids: imageIds,
+         shared_task_id: null,
+       };
+-      const shouldAutoStart = value.autoStart && !forceCreateOnlyRef.current;
+-      if (shouldAutoStart) {
+-        const repos = value.repoBranches.map((rb) => ({
+-          repo_id: rb.repoId,
+-          target_branch: rb.branch,
+-        }));
+-        await createAndStart.mutateAsync(
+-          {
+-            task,
+-            executor_profile_id: value.executorProfileId!,
+-            repos,
+-          },
+-          { onSuccess: () => modal.remove() }
+-        );
+-      } else {
+-        await createTask.mutateAsync(task, { onSuccess: () => modal.remove() });
+-      }
++      await createTask.mutateAsync(task, { onSuccess: () => modal.remove() });
+     }
+   };
+ 
+@@ -509,7 +492,7 @@
+                       isSingleRepo ? '' : 'space-y-3',
+                       autoStartField.state.value
+                         ? 'opacity-100'
+-                        : 'opacity-0 pointer-events-none'
++                        : 'hidden'
+                     )}
+                   >
+                     <div className="flex items-center gap-2">
+@@ -623,30 +606,7 @@
+ 
+             {/* Autostart switch */}
+             <div className="flex items-center gap-3">
+-              {!editMode && (
+-                <form.Field name="autoStart">
+-                  {(field) => (
+-                    <div className="flex items-center gap-2">
+-                      <Switch
+-                        id="autostart-switch"
+-                        checked={field.state.value}
+-                        onCheckedChange={(checked) =>
+-                          field.handleChange(checked)
+-                        }
+-                        disabled={isSubmitting}
+-                        className="data-[state=checked]:bg-gray-900 dark:data-[state=checked]:bg-gray-100"
+-                        aria-label={t('taskFormDialog.startLabel')}
+-                      />
+-                      <Label
+-                        htmlFor="autostart-switch"
+-                        className="text-sm cursor-pointer"
+-                      >
+-                        {t('taskFormDialog.startLabel')}
+-                      </Label>
+-                    </div>
+-                  )}
+-                </form.Field>
+-              )}
++              {!editMode && <p className="text-sm text-muted-foreground">创建后请在看板中规划，批准后再实施。</p>}
+ 
+               {/* Create/Start/Update button*/}
+               <form.Subscribe
