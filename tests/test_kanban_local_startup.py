@@ -45,7 +45,7 @@ class KanbanLocalStartupTests(unittest.TestCase):
         server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
         threading.Thread(target=server.serve_forever, daemon=True).start()
         try:
-            result = subprocess.run(['powershell', '-NoProfile', '-File', str(SCRIPT), '-BackendOnly', '-Port', str(server.server_port)],
+            result = subprocess.run(['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(SCRIPT), '-BackendOnly', '-Port', str(server.server_port)],
                                     capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=30)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             codex = profiles['executors']['CODEX']['DEFAULT']['CODEX']
@@ -85,6 +85,7 @@ class KanbanLocalStartupTests(unittest.TestCase):
             tracking_db = folder / 'test-tracking.sqlite'
             db = sqlite3.connect(tracking_db)
             db.execute('CREATE TABLE tasks(id BLOB PRIMARY KEY,project_id BLOB,title TEXT,description TEXT,status TEXT)')
+            db.executescript('CREATE TABLE workspaces(id BLOB PRIMARY KEY,task_id BLOB); CREATE TABLE sessions(id BLOB PRIMARY KEY,workspace_id BLOB); CREATE TABLE execution_processes(id BLOB PRIMARY KEY,session_id BLOB,run_reason TEXT,executor_action TEXT,status TEXT);')
             db.close()
             # Substitute only npx in the child's PATH; never start a second real DB server.
             backend = folder / 'fake_backend.py'
@@ -111,7 +112,7 @@ server.serve_forever();server.server_close()
                    'PR_CYCLE_CLAUDE_PATH': str(folder / 'missing-claude.exe')}
             with (folder / 'launcher.log').open('w', encoding='utf-8') as log:
                 mode_args = ['-BackendOnly'] if backend_only else ['-FrontendPort', str(extra_ports[0]), '-BackendPort', str(extra_ports[1]), '-TrackingDatabase', str(tracking_db)]
-                proc = subprocess.Popen(['powershell', '-NoProfile', '-File', str(SCRIPT), *mode_args,
+                proc = subprocess.Popen(['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(SCRIPT), *mode_args,
                                          '-Port', str(port), '-RuntimePath', str(runtime)],
                                         stdout=log, stderr=log, env=env)
                 try:

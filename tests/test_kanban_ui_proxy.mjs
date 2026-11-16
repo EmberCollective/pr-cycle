@@ -8,6 +8,19 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { createUiServer } from '../skills/pr-cycle/scripts/serve-kanban-ui.mjs';
 
+test('controlled public proxy blocks native execution and publication bypasses', async t => {
+  const ui = createUiServer({ dist: '.', backendPort: 1, workflowService: {} });
+  ui.listen(0, '127.0.0.1'); await once(ui, 'listening');
+  t.after(() => ui.shutdown());
+  const base = `http://127.0.0.1:${ui.address().port}`;
+  for (const route of ['/api/task-attempts', '/api/tasks/create-and-start',
+    '/api/sessions/id/follow-up', '/api/sessions/id/review', '/api/sessions/id/queue',
+    '/api/task-attempts/id/merge', '/api/task-attempts/id/pr', '/api/task-attempts/id/push']) {
+    assert.equal((await fetch(base + route, { method: 'POST', headers: { Origin: base } })).status, 409, route);
+  }
+  assert.equal((await (await fetch(base + '/__pr_cycle_ui')).json()).workflow, true);
+});
+
 test('the backend automatic browser address serves the replacement while API uses the internal loopback', async (t) => {
   const dist = await mkdtemp(path.join(os.tmpdir(), 'pr-cycle-entry-'));
   t.after(() => rm(dist, { recursive: true, force: true }));

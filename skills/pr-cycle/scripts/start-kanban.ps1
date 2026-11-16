@@ -59,7 +59,7 @@ try {
         $existingUi = $null
         try { $existingUi = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/__pr_cycle_ui" -TimeoutSec 2 } catch {}
         if ($existingUi) {
-            if ($existingUi.component -ne 'react-virtuoso' -or $existingUi.backendPort -ne $apiPort -or $existingUi.backendHost -ne $apiHost -or -not $existingUi.tracking -or $existingUi.trackingDatabase -ne $TrackingDatabase) {
+            if ($existingUi.component -ne 'react-virtuoso' -or $existingUi.backendPort -ne $apiPort -or $existingUi.backendHost -ne $apiHost -or -not $existingUi.tracking -or -not $existingUi.workflow -or $existingUi.trackingDatabase -ne $TrackingDatabase) {
                 throw "Port $Port still belongs to an older server. Finish active workers and stop the old launcher before migrating this entry point."
             }
         } else {
@@ -112,6 +112,8 @@ try {
         if ($TrackingDatabase) { $trackingArgs += @('--db', $TrackingDatabase) }
         & $python (Join-Path $PSScriptRoot 'kanban_tracking.py') @trackingArgs
         if ($LASTEXITCODE -ne 0) { throw 'Workflow tracking setup failed; database was not replaced.' }
+        & $python (Join-Path $PSScriptRoot 'kanban_workflow.py') @trackingArgs
+        if ($LASTEXITCODE -ne 0) { throw 'Workflow approval guard setup failed; no new workers should be started.' }
     }
     & $python (Join-Path $PSScriptRoot 'use_local_clis.py') --port $Port
     if ($LASTEXITCODE -ne 0) { throw 'Local CLI setup failed; see the diagnostic above before starting workers.' }

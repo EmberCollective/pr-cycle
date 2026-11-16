@@ -37,6 +37,8 @@ if (-not $alreadyPatched) {
 }
 Copy-Item -LiteralPath (Join-Path $assets 'MessageList.tsx') -Destination (Join-Path $source 'frontend/src/components/common/MessageList.tsx')
 Copy-Item -LiteralPath (Join-Path $assets 'WorkflowBoard.tsx') -Destination (Join-Path $source 'frontend/src/components/tasks/TaskKanbanBoard.tsx')
+Copy-Item -LiteralPath (Join-Path $assets 'WorkflowControls.tsx') -Destination (Join-Path $source 'frontend/src/components/tasks/WorkflowControls.tsx')
+Copy-Item -LiteralPath (Join-Path $assets 'workflow-model.ts') -Destination (Join-Path $source 'frontend/src/components/tasks/workflow-model.ts')
 Copy-Item -LiteralPath (Join-Path $assets 'workflow-board.css') -Destination (Join-Path $source 'frontend/src/components/tasks/workflow-board.css')
 Copy-Item -LiteralPath (Join-Path $assets 'conversationEntries.ts') -Destination (Join-Path $source 'frontend/src/utils/conversationEntries.ts')
 # The search patch builds on the page patch and replaces overlapping hunks.
@@ -46,7 +48,7 @@ $ErrorActionPreference = 'Continue'
 & $git -C $source apply --reverse --check (Join-Path $assets 'workflow-search.patch') 2>$null
 $workflowSearchPatched = $LASTEXITCODE -eq 0
 $ErrorActionPreference = $savedPreference
-foreach ($patchName in @('conversation-events.patch', 'workflow-page.patch', 'workflow-search.patch')) {
+foreach ($patchName in @('conversation-events.patch', 'workflow-page.patch', 'workflow-search.patch', 'workflow-gates.patch')) {
     if ($patchName -eq 'workflow-page.patch' -and $workflowSearchPatched) { continue }
     $uiPatch = Join-Path $assets $patchName
     $savedPreference = $ErrorActionPreference

@@ -44,6 +44,7 @@ try {
     const requestBase = fixture.base;
     try {
       const req = route.request();
+      if (new URL(req.url()).pathname === '/api/pr-cycle/workflow') return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true, data: { workflows: [], settings: { prompts: {} } } }) });
       const response = await page.request.fetch(requestBase + new URL(req.url()).pathname + new URL(req.url()).search, {
         method: req.method(), data: req.postDataBuffer() ?? undefined,
         headers: req.method() === 'POST' ? { 'Content-Type': 'application/json' } : {},
@@ -56,12 +57,15 @@ try {
   });
   await page.goto(`${base}/workflow-board-test.html`, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForFunction(() => document.querySelectorAll('.workflow-current').length === 4, undefined, { timeout: 60000 });
-  // Real pointer drag uses the same DnD provider and TaskCard as production.
+  // Drag cannot bypass the new plan/approval gate; native background history remains readable.
   const card = page.locator('.workflow-current').filter({ hasText: '登录修复' }).locator('[role="button"]');
   const box = await card.boundingBox();
   await page.mouse.move(box.x + 70, box.y + 45); await page.mouse.down();
   await page.mouse.move(box.x + 90, box.y + 45, { steps: 3 });
   await page.mouse.move(box.x + 410, box.y + 45, { steps: 20 }); await page.mouse.up();
+  await page.getByRole('alert').filter({ hasText: '不能拖拽跳过' }).waitFor();
+  assert.equal(await page.locator('[data-trace-node]').count(), 4);
+  await fixture.native('update', { id: ids[0], status: 'inprogress' });
   await page.waitForFunction(() => document.querySelectorAll('[data-trace-node]').length === 5);
   assert.equal(await page.locator('.workflow-current').count(), 4);
   assert.equal(await page.locator('.workflow-history').count(), 1);
@@ -74,6 +78,7 @@ try {
   await page.getByLabel('连线说明').fill('修复边界情况并补充测试');
   await page.getByRole('button', { name: '保存说明', exact: true }).click();
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  await page.getByRole('button', { name: '设置', exact: true }).click();
   await page.getByRole('button', { name: '关联任务', exact: true }).click();
   await page.getByRole('dialog').getByLabel('登录修复', { exact: true }).check();
   await page.getByRole('dialog').getByLabel('按钮文案', { exact: true }).check();
@@ -85,7 +90,10 @@ try {
   // Independent cards fade; connected sources, histories and target stay visible.
   await page.getByRole('button', { name: '追踪 登录修复 第 2 轮', exact: true }).click();
   assert.equal(await page.locator('.workflow-node').filter({ hasText: '独立任务' }).evaluate(el => el.style.opacity), '0.28');
+  await page.getByRole('button', { name: '设置', exact: true }).click();
   await page.getByRole('button', { name: '显示全部路径' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: '设置', exact: true }).click();
   await page.getByRole('button', { name: '关联任务', exact: true }).click();
   await page.getByLabel('关系类型').selectOption('sequence');
   await page.getByRole('dialog').getByLabel('小改动整合', { exact: true }).check();
@@ -99,10 +107,11 @@ try {
   await page.getByRole('button', { name: '移除关联', exact: true }).click();
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
   await page.waitForFunction(() => document.querySelectorAll('[data-trace-edge="sequence"]').length === 2);
-  await page.locator('.workflow-history').first().getByRole('button', { name: /登录修复/ }).last().click();
+  await page.locator('.workflow-history').first().locator('.workflow-snapshot').click();
   await page.getByRole('dialog').waitFor();
   assert.match(await page.getByRole('dialog').innerText(), /追踪起点/);
   await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: '设置', exact: true }).click();
   await page.getByLabel('折叠历史', { exact: true }).check();
   assert.equal(await page.locator('.workflow-history').count(), 0);
   await page.getByLabel('折叠历史', { exact: true }).uncheck();
@@ -130,7 +139,7 @@ try {
   await page.setViewportSize({ width: 800, height: 700 });
   assert.equal(await page.locator('[data-trace-node]').count(), 7);
   assert.deepEqual(errors, []);
-  console.log('PASS: real drag retains history; background changes; return reason; integration; path highlighting; snapshot; collapse/filter; persistence after proxy/browser restart; narrow viewport.');
+  console.log('PASS: real drag cannot bypass plan approval; native changes retain history; background changes; return reason; integration; path highlighting; snapshot; collapse/filter; persistence after proxy/browser restart; narrow viewport.');
 } catch (error) {
   if (page) {
     console.error(await page.locator('body').innerText().catch(() => 'Unable to read page'));
@@ -141,7 +150,7 @@ try {
   restarting = true;
   if (browser) await browser.close();
   if (vite && vite.exitCode === null) {
-    if (process.platform === 'win32') execFileSync('taskkill', ['/PID', String(vite.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
+    if (process.platform === 'win32') { try { execFileSync('taskkill', ['/PID', String(vite.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' }); } catch (error) { console.warn('Test server cleanup:', error.message); } }
     else vite.kill();
   }
   if (fixture) await fixture.close();

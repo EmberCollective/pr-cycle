@@ -44,7 +44,8 @@ try {
       return route.fulfill({ status: 200, contentType: 'application/json', body: '{"success":true,"data":{}}' });
     }
     const pathname = new URL(request.url()).pathname;
-    const data = pathname === '/api/pr-cycle/tracking' ? graph
+    const data = pathname === '/api/pr-cycle/workflow' ? { workflows: [], settings: { prompts: {} } }
+      : pathname === '/api/pr-cycle/tracking' ? graph
       : pathname === '/api/tasks' ? Object.values(tasks) : undefined;
     if (data !== undefined) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data }) });
